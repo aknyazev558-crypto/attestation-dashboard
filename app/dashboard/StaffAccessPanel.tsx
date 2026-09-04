@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { assignStaff, removeStaff } from "./actions";
+import { assignStaff, removeStaff, updateStaffAccess } from "./actions";
 import { DEPARTMENTS, DEPARTMENT_ORDER } from "@/lib/competencies";
 import type { Profile } from "@/lib/types";
 
@@ -10,6 +10,84 @@ function randomPassword() {
   let out = "";
   for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
+}
+
+function EditStaffRow({
+  staffMember,
+  email,
+  blockIds: initialBlockIds,
+  onDone,
+}: {
+  staffMember: Profile;
+  email: string;
+  blockIds: string[];
+  onDone: () => void;
+}) {
+  const [fullName, setFullName] = useState(staffMember.full_name || "");
+  const [position, setPosition] = useState(staffMember.position || "");
+  const [blockIds, setBlockIds] = useState<string[]>(initialBlockIds);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function toggleBlock(id: string) {
+    setBlockIds((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
+  }
+
+  function handleSave() {
+    setError(null);
+    const fd = new FormData();
+    fd.set("userId", staffMember.id);
+    fd.set("fullName", fullName);
+    fd.set("position", position);
+    blockIds.forEach((id) => fd.append("blockIds", id));
+    startTransition(async () => {
+      const result = await updateStaffAccess(fd);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      onDone();
+    });
+  }
+
+  return (
+    <tr>
+      <td>
+        <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="ФИО" />
+      </td>
+      <td>
+        <input
+          value={position}
+          onChange={(e) => setPosition(e.target.value)}
+          placeholder="Должность"
+        />
+      </td>
+      <td className="brands">{email}</td>
+      <td>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {DEPARTMENT_ORDER.map((id) => (
+            <label key={id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={blockIds.includes(id)}
+                onChange={() => toggleBlock(id)}
+              />
+              {DEPARTMENTS[id].name}
+            </label>
+          ))}
+        </div>
+        {error && <div className="error-note">{error}</div>}
+      </td>
+      <td style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+        <button className="btn small primary" onClick={handleSave} disabled={isPending}>
+          {isPending ? "Сохранение…" : "Сохранить"}
+        </button>
+        <button className="btn ghost small" onClick={onDone} disabled={isPending}>
+          Отмена
+        </button>
+      </td>
+    </tr>
+  );
 }
 
 export default function StaffAccessPanel({
@@ -32,6 +110,7 @@ export default function StaffAccessPanel({
   const [savedPassword, setSavedPassword] = useState<{ email: string; password: string } | null>(
     null
   );
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function reset() {
@@ -102,29 +181,46 @@ export default function StaffAccessPanel({
               </tr>
             </thead>
             <tbody>
-              {staff.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.full_name || "—"}</td>
-                  <td>{s.position || "—"}</td>
-                  <td className="brands">{staffEmails[s.id] || "—"}</td>
-                  <td>
-                    {(staffBlocks[s.id] || []).length
-                      ? (staffBlocks[s.id] || [])
-                          .map((id) => DEPARTMENTS[id]?.name || id)
-                          .join(", ")
-                      : "нет доступа"}
-                  </td>
-                  <td>
-                    <button
-                      className="btn danger small"
-                      onClick={() => handleRemove(s.id, s.full_name || staffEmails[s.id] || "")}
-                      disabled={isPending}
-                    >
-                      Удалить
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {staff.map((s) =>
+                editingId === s.id ? (
+                  <EditStaffRow
+                    key={s.id}
+                    staffMember={s}
+                    email={staffEmails[s.id] || "—"}
+                    blockIds={staffBlocks[s.id] || []}
+                    onDone={() => setEditingId(null)}
+                  />
+                ) : (
+                  <tr key={s.id}>
+                    <td>{s.full_name || "—"}</td>
+                    <td>{s.position || "—"}</td>
+                    <td className="brands">{staffEmails[s.id] || "—"}</td>
+                    <td>
+                      {(staffBlocks[s.id] || []).length
+                        ? (staffBlocks[s.id] || [])
+                            .map((id) => DEPARTMENTS[id]?.name || id)
+                            .join(", ")
+                        : "нет доступа"}
+                    </td>
+                    <td style={{ display: "flex", gap: 6 }}>
+                      <button
+                        className="btn ghost small"
+                        onClick={() => setEditingId(s.id)}
+                        disabled={isPending}
+                      >
+                        Изменить
+                      </button>
+                      <button
+                        className="btn danger small"
+                        onClick={() => handleRemove(s.id, s.full_name || staffEmails[s.id] || "")}
+                        disabled={isPending}
+                      >
+                        Удалить
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
             </tbody>
           </table>
         </div>

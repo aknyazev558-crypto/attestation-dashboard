@@ -356,6 +356,46 @@ export async function assignStaff(formData: FormData) {
   return { ok: true, passwordSet: !!password };
 }
 
+export async function updateStaffAccess(formData: FormData) {
+  const userId = String(formData.get("userId") || "");
+  const fullName = String(formData.get("fullName") || "").trim();
+  const position = String(formData.get("position") || "").trim();
+  const blockIds = formData.getAll("blockIds").map((v) => String(v));
+
+  if (!userId) {
+    return { error: "Сотрудник не указан." };
+  }
+
+  const requester = await requireOwnerLevel();
+  if (!requester) {
+    return { error: "Только владелец сети или CEO может изменять доступ сотрудников." };
+  }
+
+  const supabase = await createClient();
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ full_name: fullName || null, position: position || null })
+    .eq("id", userId)
+    .eq("role", "staff");
+  if (profileError) {
+    return { error: profileError.message };
+  }
+
+  // Same "replace wholesale" approach as assignStaff — simpler than diffing.
+  await supabase.from("staff_block_access").delete().eq("user_id", userId);
+  if (blockIds.length) {
+    const { error: accessError } = await supabase
+      .from("staff_block_access")
+      .insert(blockIds.map((block_id) => ({ user_id: userId, block_id })));
+    if (accessError) {
+      return { error: accessError.message };
+    }
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 export async function removeStaff(formData: FormData) {
   const userId = String(formData.get("userId") || "");
   if (!userId) {
