@@ -82,11 +82,12 @@ export default function AttestationTab({
   const ceoEditable = isCeo && isCurrentCycle;
 
   async function saveRecord(patch: Partial<Attestation>) {
-    if (!record || !selectedCycle) return;
+    if (!record || !selectedCycle) return false;
+    const previous = record;
     const next = { ...record, ...patch };
     setRecord(next);
     setSaving(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("attestations")
       .upsert(
         {
@@ -109,7 +110,20 @@ export default function AttestationTab({
       .select()
       .single();
     setSaving(false);
-    if (data) setRecord(data as Attestation);
+    if (error || !data) {
+      // Roll back the optimistic update — without this, a failed save
+      // (network hiccup, RLS denial, a column the DB migration hasn't
+      // added yet) would leave the screen showing "saved" state — e.g.
+      // the self-assessment "submitted and locked" banner — that was
+      // never actually written, with nothing on screen to say so.
+      setRecord(previous);
+      setSubmitError(
+        "Не удалось сохранить: " + (error?.message || "неизвестная ошибка") + ". Попробуйте ещё раз."
+      );
+      return false;
+    }
+    setRecord(data as Attestation);
+    return true;
   }
 
   function handleNewCycle() {
@@ -196,13 +210,20 @@ export default function AttestationTab({
                   {" "}
                   <button
                     className="btn ghost small"
-                    onClick={() => saveRecord({ self_submitted: false })}
+                    onClick={() => {
+                      setSubmitError(null);
+                      saveRecord({ self_submitted: false });
+                    }}
                   >
                     Разблокировать
                   </button>
                 </>
               )}
             </div>
+          )}
+
+          {submitError && !selfEditable && (
+            <div className="error-note">{submitError}</div>
           )}
 
           <div className="sheet">
