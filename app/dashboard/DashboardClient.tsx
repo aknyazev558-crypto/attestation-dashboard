@@ -1,6 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { computeResult, nextQuarterLabel } from "@/lib/competencies";
 import type { Attestation, Branch, Cycle, IprItem, Profile } from "@/lib/types";
@@ -29,6 +30,20 @@ export default function DashboardClient({
   adminEmails: Record<string, string>;
 }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  // Returning here via the browser's back/forward button can restore a
+  // frozen bfcache snapshot instead of asking the server for anything —
+  // so a director's submission that happened while this tab sat in
+  // history can look invisible (stale status dot) until something forces
+  // a refetch. Only fires for that specific case (event.persisted).
+  useEffect(() => {
+    function handlePageShow(e: PageTransitionEvent) {
+      if (e.persisted) router.refresh();
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, [router]);
 
   const attByBranch = new Map(attestations.map((a) => [a.branch_id, a]));
   const iprByBranch = new Map<string, IprItem[]>();
