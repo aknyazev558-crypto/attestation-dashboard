@@ -31,7 +31,10 @@ export type Attestation = {
   cycle: string;
   self_scores: ScoreMap;
   manager_scores: ScoreMap;
-  achievements: string | null;
+  self_submitted: boolean;
+  achievement_1: string | null;
+  achievement_2: string | null;
+  achievement_3: string | null;
   growth_areas: string | null;
   discussion: string | null;
   decision: string | null;

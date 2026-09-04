@@ -19,7 +19,10 @@ function blankRecord(branchId: string, cycle: string): Attestation {
     cycle,
     self_scores: {},
     manager_scores: {},
-    achievements: "",
+    self_submitted: false,
+    achievement_1: "",
+    achievement_2: "",
+    achievement_3: "",
     growth_areas: "",
     discussion: "",
     decision: "",
@@ -48,6 +51,7 @@ export default function AttestationTab({
   const [record, setRecord] = useState<Attestation | null>(null);
   const [loadedCycle, setLoadedCycle] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const loading = selectedCycle != null && loadedCycle !== selectedCycle;
@@ -74,7 +78,6 @@ export default function AttestationTab({
   }, [branchId, selectedCycle]);
 
   const isCurrentCycle = selectedCycle === currentCycle;
-  const selfEditable = isOwnDirector && isCurrentCycle;
   const mgrEditable = isOwner && isCurrentCycle;
   const ceoEditable = isCeo && isCurrentCycle;
 
@@ -91,7 +94,10 @@ export default function AttestationTab({
           cycle: selectedCycle,
           self_scores: next.self_scores,
           manager_scores: next.manager_scores,
-          achievements: next.achievements,
+          self_submitted: next.self_submitted,
+          achievement_1: next.achievement_1,
+          achievement_2: next.achievement_2,
+          achievement_3: next.achievement_3,
           growth_areas: next.growth_areas,
           discussion: next.discussion,
           decision: next.decision,
@@ -127,6 +133,20 @@ export default function AttestationTab({
 
   const rec = record || blankRecord(branchId, selectedCycle || "");
   const result = computeResult(rec);
+  const selfEditable = isOwnDirector && isCurrentCycle && !rec.self_submitted;
+
+  async function submitSelfAssessment() {
+    const missing =
+      !(rec.achievement_1 || "").trim() ||
+      !(rec.achievement_2 || "").trim() ||
+      !(rec.achievement_3 || "").trim();
+    if (missing) {
+      setSubmitError("Заполните все три ключевых достижения перед отправкой самооценки.");
+      return;
+    }
+    setSubmitError(null);
+    await saveRecord({ self_submitted: true });
+  }
 
   return (
     <div>
@@ -164,6 +184,24 @@ export default function AttestationTab({
             <div className="locked-note">
               Это архивный квартал — только просмотр. Редактировать можно
               активный квартал: {currentCycle}.
+            </div>
+          )}
+
+          {isCurrentCycle && rec.self_submitted && (
+            <div className="locked-note">
+              Самооценка за этот квартал отправлена директором и заблокирована
+              для изменений.
+              {(isOwner || isCeo) && (
+                <>
+                  {" "}
+                  <button
+                    className="btn ghost small"
+                    onClick={() => saveRecord({ self_submitted: false })}
+                  >
+                    Разблокировать
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -212,12 +250,43 @@ export default function AttestationTab({
             </div>
           </div>
 
-          <TextField
-            label="Ключевые достижения за квартал"
-            value={rec.achievements}
-            editable={selfEditable || mgrEditable}
-            onSave={(v) => saveRecord({ achievements: v })}
-          />
+          <div className="field-block">
+            <label>Ключевые достижения за квартал (минимум 3)</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
+              <AchievementInput
+                index={1}
+                value={rec.achievement_1}
+                editable={selfEditable}
+                onSave={(v) => saveRecord({ achievement_1: v })}
+              />
+              <AchievementInput
+                index={2}
+                value={rec.achievement_2}
+                editable={selfEditable}
+                onSave={(v) => saveRecord({ achievement_2: v })}
+              />
+              <AchievementInput
+                index={3}
+                value={rec.achievement_3}
+                editable={selfEditable}
+                onSave={(v) => saveRecord({ achievement_3: v })}
+              />
+            </div>
+          </div>
+
+          {selfEditable && (
+            <div style={{ marginTop: 10 }}>
+              <button className="btn primary small" onClick={submitSelfAssessment}>
+                Отправить самооценку
+              </button>
+              <div className="field-note">
+                После отправки самооценка и достижения будут заблокированы для
+                редактирования.
+              </div>
+              {submitError && <div className="error-note">{submitError}</div>}
+            </div>
+          )}
+
           <TextField
             label="Ключевые зоны роста"
             value={rec.growth_areas}
@@ -328,6 +397,40 @@ function ScoreSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+function AchievementInput({
+  index,
+  value,
+  editable,
+  onSave,
+}: {
+  index: number;
+  value: string | null;
+  editable: boolean;
+  onSave: (v: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span
+        className="badge none"
+        style={{ flex: "none", width: 22, height: 22, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
+        {index}
+      </span>
+      <input
+        key={value ?? ""}
+        className="ipr-input"
+        style={{ border: "1px solid var(--line)", padding: "7px 9px" }}
+        defaultValue={value || ""}
+        disabled={!editable}
+        placeholder={editable ? `Достижение ${index}` : "Не заполнено"}
+        onBlur={(e) => {
+          if (e.target.value !== (value || "")) onSave(e.target.value);
+        }}
+      />
+    </div>
   );
 }
 

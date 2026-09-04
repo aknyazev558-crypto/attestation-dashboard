@@ -162,7 +162,19 @@ export default function DashboardClient({
                         <BranchNameCell branch={r.branch} />
                       </td>
                       <td>
-                        <AssignDirectorCell branchId={r.branch.id} directorName={director} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          {director && (
+                            <span
+                              className={"status-dot " + (r.rec?.self_submitted ? "ok" : "crit")}
+                              title={
+                                r.rec?.self_submitted
+                                  ? "Самооценка за квартал отправлена"
+                                  : "Самооценка за квартал ещё не отправлена"
+                              }
+                            />
+                          )}
+                          <AssignDirectorCell branchId={r.branch.id} directorName={director} />
+                        </div>
                       </td>
                       <td className="brands">{(r.branch.brands || []).join(", ")}</td>
                       <td>
