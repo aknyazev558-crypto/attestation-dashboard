@@ -84,11 +84,10 @@ export async function assignDirector(formData: FormData) {
   const admin = createAdminClient();
 
   // Try inviting first: for a brand-new email this creates the user and
-  // sends the invite; for an email that was invited before but never
-  // confirmed, Supabase resends a fresh link (picking up the redirectTo
-  // fix below even for invites sent earlier). It only fails once the
-  // account is already confirmed — in that case we just look them up and
-  // reassign, without sending another email.
+  // sends the invite; for an email invited before but never confirmed,
+  // Supabase is supposed to resend a fresh link. It only fails outright
+  // once the account is already confirmed — in that case we look them up
+  // and just reassign, no email expected.
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     email,
     { redirectTo: `${getSiteUrl()}/auth/set-password` }
@@ -108,6 +107,18 @@ export async function assignDirector(formData: FormData) {
     );
     if (!existingUser) {
       return { error: inviteError?.message || "Не удалось пригласить пользователя." };
+    }
+
+    if (!existingUser.email_confirmed_at) {
+      // Still pending, never set a password — the invite call above
+      // failed for some other reason (most commonly Supabase's built-in
+      // email sender rate limit, a few emails/hour on the free tier).
+      // Surface that instead of quietly reassigning with no email sent.
+      return {
+        error:
+          (inviteError?.message ? `Письмо не отправлено: ${inviteError.message}. ` : "Письмо не отправлено. ") +
+          "Часто причина — лимит писем встроенного email-сервиса Supabase (несколько писем в час на бесплатном плане). Подождите немного и попробуйте ещё раз, либо подключите свой SMTP: Supabase → Authentication → Emails → SMTP Settings.",
+      };
     }
     targetId = existingUser.id;
   }
