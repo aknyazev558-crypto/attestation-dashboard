@@ -4,15 +4,18 @@ import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { computeResult, nextQuarterLabel } from "@/lib/competencies";
-import type { Attestation, Branch, Cycle, IprItem, Profile } from "@/lib/types";
+import type { Attestation, Branch, Competency, Cycle, IprItem, Profile } from "@/lib/types";
 import { addBranch, createCycle, deleteBranch, setCurrentCycle } from "./actions";
 import AssignDirectorCell from "./AssignDirectorCell";
 import BranchNameCell from "./BranchNameCell";
 import AdminUsersPanel from "./AdminUsersPanel";
 import StaffAccessPanel from "./StaffAccessPanel";
+import CompetencyManagerPanel from "./CompetencyManagerPanel";
+import StaffCompetencyPanel from "./StaffCompetencyPanel";
 
 export default function DashboardClient({
   canManage,
+  isStaffViewer,
   branches,
   cycles,
   currentCycle,
@@ -24,8 +27,11 @@ export default function DashboardClient({
   staff,
   staffEmails,
   staffBlocks,
+  competencies,
+  viewerDepartmentIds,
 }: {
   canManage: boolean;
+  isStaffViewer: boolean;
   branches: Branch[];
   cycles: Cycle[];
   currentCycle: string | null;
@@ -37,6 +43,8 @@ export default function DashboardClient({
   staff: Profile[];
   staffEmails: Record<string, string>;
   staffBlocks: Record<string, string[]>;
+  competencies: Competency[];
+  viewerDepartmentIds: string[];
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -65,7 +73,7 @@ export default function DashboardClient({
   const results = branches.map((b) => ({
     branch: b,
     rec: attByBranch.get(b.id) || null,
-    result: computeResult(attByBranch.get(b.id)),
+    result: computeResult(attByBranch.get(b.id), competencies),
   }));
 
   const risky = results.filter((r) => r.result.tone === "warn" || r.result.tone === "crit").length;
@@ -123,7 +131,12 @@ export default function DashboardClient({
         <>
           <AdminUsersPanel admins={admins} adminEmails={adminEmails} />
           <StaffAccessPanel staff={staff} staffEmails={staffEmails} staffBlocks={staffBlocks} />
+          <CompetencyManagerPanel competencies={competencies} />
         </>
+      )}
+
+      {isStaffViewer && (
+        <StaffCompetencyPanel competencies={competencies} departmentIds={viewerDepartmentIds} />
       )}
 
       <div className="stats">

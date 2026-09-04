@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Branch, Cycle } from "@/lib/types";
+import type { Branch, Competency, Cycle } from "@/lib/types";
 import AttestationTab from "./AttestationTab";
 import IprTab from "./IprTab";
 
@@ -10,6 +10,7 @@ export default function BranchDetailClient({
   branch,
   cycles,
   currentCycle,
+  competencies,
   isOwner,
   isCeo,
   isStaff,
@@ -20,6 +21,7 @@ export default function BranchDetailClient({
   branch: Branch;
   cycles: Cycle[];
   currentCycle: string | null;
+  competencies: Competency[];
   isOwner: boolean;
   isCeo: boolean;
   isStaff: boolean;
@@ -81,6 +83,7 @@ export default function BranchDetailClient({
           branchId={branch.id}
           cycles={cycles}
           currentCycle={currentCycle}
+          competencies={competencies}
           isOwner={isOwner}
           isCeo={isCeo}
           staffBlockIds={staffBlockIds}

@@ -1,4 +1,6 @@
-import type { Attestation, ScoreMap } from "@/lib/types";
+import type { Attestation, Competency, ScoreMap } from "@/lib/types";
+
+export type { Competency };
 
 export interface Block {
   id: string;
@@ -6,12 +8,13 @@ export interface Block {
   weight: number;
 }
 
-export interface Competency {
-  id: string;
-  block: string;
-  name: string;
-}
-
+// The 4 weighted scoring blocks behind the итог/computeResult below — kept
+// exactly as before. Separate from the 7 department blocks (Продажи, ППО,
+// HR, Маркетинг, КЦ, CQ, FinDep) further down, which organize competencies
+// and staff edit access by function and don't carry a weight of their own;
+// a competency's scoring block and department are independent (a new one
+// added by staff starts with block = null — excluded from the weighted
+// total until owner/CEO assign it a block in the "Компетенции" panel).
 export const BLOCKS: Record<string, Block> = {
   "1": { id: "1", name: "Бизнес-результат", weight: 0.35 },
   "2": { id: "2", name: "Управление командой", weight: 0.25 },
@@ -21,37 +24,22 @@ export const BLOCKS: Record<string, Block> = {
 
 export const BLOCK_ORDER = ["1", "2", "3", "4"];
 
-export const COMPETENCIES: Competency[] = [
-  { id: "c1", block: "1", name: "Выполнение плана продаж" },
-  { id: "c2", block: "1", name: "Управление рентабельностью точки" },
-  { id: "c3", block: "1", name: "Управление стоком/складом автомобилей" },
-  { id: "c4", block: "2", name: "Подбор и адаптация персонала" },
-  { id: "c5", block: "2", name: "Постановка задач и контроль исполнения" },
-  {
-    id: "c6",
-    block: "2",
-    name: "Развитие сотрудников, работа с низкой эффективностью",
-  },
-  { id: "c7", block: "2", name: "Атмосфера в команде / климат" },
-  {
-    id: "c8",
-    block: "3",
-    name: "Соблюдение стандартов бренда (dealer standards)",
-  },
-  { id: "c9", block: "3", name: "Работа с CRM и отчётностью" },
-  {
-    id: "c10",
-    block: "3",
-    name: "Клиентский сервис (NPS, работа с претензиями)",
-  },
-  { id: "c11", block: "4", name: "Принятие решений и ответственность" },
-  {
-    id: "c12",
-    block: "4",
-    name: "Коммуникация с головным офисом / импортёром",
-  },
-  { id: "c13", block: "4", name: "Обучаемость и работа над собой" },
-];
+export interface Department {
+  id: string;
+  name: string;
+}
+
+export const DEPARTMENTS: Record<string, Department> = {
+  sales: { id: "sales", name: "Продажи" },
+  ppo: { id: "ppo", name: "ППО" },
+  hr: { id: "hr", name: "HR" },
+  marketing: { id: "marketing", name: "Маркетинг" },
+  kc: { id: "kc", name: "КЦ" },
+  cq: { id: "cq", name: "CQ" },
+  findep: { id: "findep", name: "FinDep" },
+};
+
+export const DEPARTMENT_ORDER = ["sales", "ppo", "hr", "marketing", "kc", "cq", "findep"];
 
 export type Tone = "ok" | "accent" | "warn" | "crit" | "none";
 
@@ -64,7 +52,8 @@ export interface AttestationResult {
 }
 
 export function computeResult(
-  record: Pick<Attestation, "self_scores" | "manager_scores"> | null | undefined
+  record: Pick<Attestation, "self_scores" | "manager_scores"> | null | undefined,
+  competencies: Competency[]
 ): AttestationResult {
   if (!record) {
     return { score: null, category: null, label: "Нет данных", tone: "none", forced: false };
@@ -78,7 +67,7 @@ export function computeResult(
 
   for (const bid of BLOCK_ORDER) {
     const block = BLOCKS[bid];
-    const comps = COMPETENCIES.filter((c) => c.block === bid);
+    const comps = competencies.filter((c) => c.block === bid);
     const scores: number[] = [];
     comps.forEach((c) => {
       const mgr = manager[c.id];

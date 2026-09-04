@@ -81,6 +81,17 @@ export type StaffBlockAccess = {
   block_id: string;
 };
 
+export type Competency = {
+  id: string;
+  block: string | null;
+  department_id: string | null;
+  name: string;
+  is_custom: boolean;
+  created_by: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -124,6 +135,12 @@ export type Database = {
         Row: StaffBlockAccess;
         Insert: StaffBlockAccess;
         Update: Partial<StaffBlockAccess>;
+        Relationships: [];
+      };
+      competencies: {
+        Row: Competency;
+        Insert: Partial<Competency> & { name: string; department_id: string };
+        Update: Partial<Competency>;
         Relationships: [];
       };
     };

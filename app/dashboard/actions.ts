@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteUrl } from "@/lib/site-url";
 import { isOwnerLevel } from "@/lib/types";
 import type { Role } from "@/lib/types";
+import { BLOCK_ORDER, DEPARTMENT_ORDER } from "@/lib/competencies";
 
 export async function addBranch(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
@@ -377,5 +378,115 @@ export async function removeStaff(formData: FormData) {
   }
 
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+/**
+ * Owner/CEO add any competency straight into any department/scoring block.
+ * A staff member can also add one, but only within a department they've
+ * been granted (checked here and, redundantly, by RLS) — it's always
+ * created with no scoring block (`block: null`), i.e. not yet counted in
+ * the weighted total, until owner/CEO assign one from the manager panel.
+ */
+export async function addCompetency(formData: FormData) {
+  const name = String(formData.get("name") || "").trim();
+  const departmentId = String(formData.get("departmentId") || "").trim();
+  const blockRaw = String(formData.get("block") || "").trim();
+
+  if (!name || !departmentId || !DEPARTMENT_ORDER.includes(departmentId)) {
+    return { error: "Укажите название компетенции и блок." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Не авторизован." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const owner = isOwnerLevel(profile?.role);
+  const staffMember = profile?.role === "staff";
+  if (!owner && !staffMember) {
+    return { error: "Недостаточно прав для добавления компетенций." };
+  }
+
+  if (staffMember) {
+    const { data: access } = await supabase
+      .from("staff_block_access")
+      .select("block_id")
+      .eq("user_id", user.id)
+      .eq("block_id", departmentId)
+      .maybeSingle();
+    if (!access) {
+      return { error: "У вас нет доступа к этому блоку компетенций." };
+    }
+  }
+
+  const { error } = await supabase.from("competencies").insert({
+    name,
+    department_id: departmentId,
+    block: owner && BLOCK_ORDER.includes(blockRaw) ? blockRaw : null,
+    is_custom: true,
+    created_by: user.id,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/branch", "layout");
+  return { ok: true };
+}
+
+export async function updateCompetency(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  const name = String(formData.get("name") || "").trim();
+  const block = String(formData.get("block") || "").trim();
+  const departmentId = String(formData.get("departmentId") || "").trim();
+  if (!id || !name) {
+    return { error: "Укажите название компетенции." };
+  }
+
+  const requester = await requireOwnerLevel();
+  if (!requester) {
+    return { error: "Только владелец сети или CEO может изменять компетенции." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("competencies")
+    .update({
+      name,
+      block: BLOCK_ORDER.includes(block) ? block : null,
+      department_id: DEPARTMENT_ORDER.includes(departmentId) ? departmentId : null,
+    })
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/branch", "layout");
+  return { ok: true };
+}
+
+export async function deleteCompetency(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (!id) {
+    return { error: "Компетенция не указана." };
+  }
+
+  const requester = await requireOwnerLevel();
+  if (!requester) {
+    return { error: "Только владелец сети или CEO может удалять компетенции." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("competencies").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/branch", "layout");
   return { ok: true };
 }

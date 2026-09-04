@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Topbar from "@/app/components/Topbar";
 import DashboardClient from "./DashboardClient";
 import { isOwnerLevel } from "@/lib/types";
-import type { Attestation, Branch, Cycle, IprItem, Profile } from "@/lib/types";
+import type { Attestation, Branch, Competency, Cycle, IprItem, Profile } from "@/lib/types";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -34,6 +34,7 @@ export default async function DashboardPage() {
     { data: admins },
     { data: staff },
     { data: blockAccess },
+    { data: competencies },
   ] = await Promise.all([
     supabase.from("branches").select("*").order("name"),
     supabase.from("cycles").select("*").order("label"),
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
     supabase.from("profiles").select("*").in("role", ["owner", "ceo"]),
     supabase.from("profiles").select("*").eq("role", "staff"),
     supabase.from("staff_block_access").select("*"),
+    supabase.from("competencies").select("*").order("sort_order"),
   ]);
 
   const cycleList = (cycles as Cycle[]) || [];
@@ -68,6 +70,13 @@ export default async function DashboardPage() {
     staffBlocks[row.user_id] = list;
   });
 
+  // RLS on staff_block_access lets a staff viewer read only their own
+  // grants, so `blockAccess` above already came back scoped to them —
+  // reuse it instead of an extra query.
+  const viewerDepartmentIds = isStaffViewer
+    ? (blockAccess || []).filter((row) => row.user_id === user.id).map((row) => row.block_id)
+    : [];
+
   const userEmails: Record<string, string> = {};
   if (process.env.SUPABASE_SERVICE_ROLE_KEY && (admins?.length || staff?.length)) {
     const admin = createAdminClient();
@@ -90,6 +99,7 @@ export default async function DashboardPage() {
       <div className="wrap">
         <DashboardClient
           canManage={canManage}
+          isStaffViewer={isStaffViewer}
           branches={(branches as Branch[]) || []}
           cycles={cycleList}
           currentCycle={currentCycle}
@@ -101,6 +111,8 @@ export default async function DashboardPage() {
           staff={(staff as Profile[]) || []}
           staffEmails={userEmails}
           staffBlocks={staffBlocks}
+          competencies={(competencies as Competency[]) || []}
+          viewerDepartmentIds={viewerDepartmentIds}
         />
       </div>
     </>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { assignStaff, removeStaff } from "./actions";
-import { BLOCKS, BLOCK_ORDER } from "@/lib/competencies";
+import { DEPARTMENTS, DEPARTMENT_ORDER } from "@/lib/competencies";
 import type { Profile } from "@/lib/types";
 
 function randomPassword() {
@@ -97,7 +97,7 @@ export default function StaffAccessPanel({
                 <th>ФИО</th>
                 <th>Должность</th>
                 <th>Email</th>
-                <th>Доступ к блокам оценки</th>
+                <th>Доступ к блокам компетенций</th>
                 <th></th>
               </tr>
             </thead>
@@ -110,7 +110,7 @@ export default function StaffAccessPanel({
                   <td>
                     {(staffBlocks[s.id] || []).length
                       ? (staffBlocks[s.id] || [])
-                          .map((id) => BLOCKS[id]?.name || id)
+                          .map((id) => DEPARTMENTS[id]?.name || id)
                           .join(", ")
                       : "нет доступа"}
                   </td>
@@ -170,10 +170,11 @@ export default function StaffAccessPanel({
             />
 
             <div className="field-note" style={{ marginTop: 4 }}>
-              Доступ к блокам оценки директоров:
+              Доступ к блокам компетенций (для оценки директоров и добавления
+              новых компетенций в свой блок):
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {BLOCK_ORDER.map((id) => (
+              {DEPARTMENT_ORDER.map((id) => (
                 <label
                   key={id}
                   style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
@@ -183,7 +184,7 @@ export default function StaffAccessPanel({
                     checked={blockIds.includes(id)}
                     onChange={() => toggleBlock(id)}
                   />
-                  {BLOCKS[id].name}
+                  {DEPARTMENTS[id].name}
                 </label>
               ))}
             </div>

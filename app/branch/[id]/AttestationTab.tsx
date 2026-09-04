@@ -5,11 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import {
   BLOCKS,
   BLOCK_ORDER,
-  COMPETENCIES,
+  DEPARTMENTS,
   computeResult,
   nextQuarterLabel,
 } from "@/lib/competencies";
-import type { Attestation, Cycle } from "@/lib/types";
+import type { Attestation, Competency, Cycle } from "@/lib/types";
 import { createCycle } from "@/app/dashboard/actions";
 
 function blankRecord(branchId: string, cycle: string): Attestation {
@@ -36,6 +36,7 @@ export default function AttestationTab({
   branchId,
   cycles,
   currentCycle,
+  competencies,
   isOwner,
   isCeo,
   staffBlockIds,
@@ -44,6 +45,7 @@ export default function AttestationTab({
   branchId: string;
   cycles: Cycle[];
   currentCycle: string | null;
+  competencies: Competency[];
   isOwner: boolean;
   isCeo: boolean;
   staffBlockIds: string[];
@@ -82,8 +84,13 @@ export default function AttestationTab({
   const isCurrentCycle = selectedCycle === currentCycle;
   const mgrEditable = isOwner && isCurrentCycle;
   const ceoEditable = isCeo && isCurrentCycle;
-  const canEditBlock = (blockId: string) =>
-    isCurrentCycle && (isOwner || staffBlockIds.includes(blockId));
+  // Staff edit access is scoped per competency by its department (Продажи,
+  // ППО, HR, ...), not by the scoring block (1-4) the row happens to fall
+  // under — a competency with no department assigned yet (owner/CEO hasn't
+  // sorted it via the "Компетенции" panel) can't be edited by staff at all.
+  const canEditCompetency = (comp: Competency) =>
+    isCurrentCycle &&
+    (isOwner || (!!comp.department_id && staffBlockIds.includes(comp.department_id)));
 
   async function saveRecord(patch: Partial<Attestation>) {
     if (!record || !selectedCycle) return false;
@@ -150,7 +157,7 @@ export default function AttestationTab({
   }
 
   const rec = record || blankRecord(branchId, selectedCycle || "");
-  const result = computeResult(rec);
+  const result = computeResult(rec, competencies);
   const selfEditable = isOwnDirector && isCurrentCycle && !rec.self_submitted;
 
   async function submitSelfAssessment() {
@@ -246,8 +253,9 @@ export default function AttestationTab({
                       key={bid}
                       bid={bid}
                       rec={rec}
+                      competencies={competencies}
                       selfEditable={selfEditable}
-                      mgrEditable={canEditBlock(bid)}
+                      canEditCompetency={canEditCompetency}
                       onSelfChange={(compId, v) =>
                         saveRecord({ self_scores: { ...rec.self_scores, [compId]: v } })
                       }
@@ -272,6 +280,12 @@ export default function AttestationTab({
               20% / 20%). Оценка «1» в блоках «Бизнес-результат» или
               «Операционное управление» автоматически переводит в «Зону
               риска».
+            </div>
+            <div className="result-note">
+              Рекомендуемый порядок оценки руководителем: сотрудники по своим
+              блокам компетенций → Руководитель сети (предпоследним) → CEO
+              (последним). Это не блокирует ввод — просто порядок, которого
+              стоит придерживаться.
             </div>
           </div>
 
@@ -355,20 +369,22 @@ export default function AttestationTab({
 function BlockRows({
   bid,
   rec,
+  competencies,
   selfEditable,
-  mgrEditable,
+  canEditCompetency,
   onSelfChange,
   onMgrChange,
 }: {
   bid: string;
   rec: Attestation;
+  competencies: Competency[];
   selfEditable: boolean;
-  mgrEditable: boolean;
+  canEditCompetency: (comp: Competency) => boolean;
   onSelfChange: (compId: string, v: number | null) => void;
   onMgrChange: (compId: string, v: number | null) => void;
 }) {
   const block = BLOCKS[bid];
-  const comps = COMPETENCIES.filter((c) => c.block === bid);
+  const comps = competencies.filter((c) => c.block === bid);
   return (
     <>
       <tr className="block-hdr">
@@ -378,7 +394,12 @@ function BlockRows({
       </tr>
       {comps.map((c) => (
         <tr key={c.id}>
-          <td className="compname">{c.name}</td>
+          <td className="compname">
+            {c.name}
+            {c.department_id && (
+              <span className="w"> · {DEPARTMENTS[c.department_id]?.name || c.department_id}</span>
+            )}
+          </td>
           <td className="center">
             <ScoreSelect
               value={rec.self_scores[c.id] ?? null}
@@ -389,7 +410,7 @@ function BlockRows({
           <td className="center">
             <ScoreSelect
               value={rec.manager_scores[c.id] ?? null}
-              editable={mgrEditable}
+              editable={canEditCompetency(c)}
               onChange={(v) => onMgrChange(c.id, v)}
             />
           </td>
