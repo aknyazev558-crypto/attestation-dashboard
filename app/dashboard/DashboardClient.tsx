@@ -4,8 +4,9 @@ import { useTransition } from "react";
 import Link from "next/link";
 import { computeResult, nextQuarterLabel } from "@/lib/competencies";
 import type { Attestation, Branch, Cycle, IprItem } from "@/lib/types";
-import { addBranch, createCycle, setCurrentCycle } from "./actions";
+import { addBranch, createCycle, deleteBranch, setCurrentCycle } from "./actions";
 import AssignDirectorCell from "./AssignDirectorCell";
+import BranchNameCell from "./BranchNameCell";
 
 export default function DashboardClient({
   branches,
@@ -64,6 +65,18 @@ export default function DashboardClient({
     fd.set("label", label);
     startTransition(() => {
       createCycle(fd);
+    });
+  }
+
+  function handleDeleteBranch(branch: Branch) {
+    const ok = window.confirm(
+      `Удалить филиал «${branch.name}»?\n\nВся история аттестаций и пункты ИПР этого филиала будут удалены безвозвратно. Назначенный директор не удаляется — просто отвязывается от филиала.`
+    );
+    if (!ok) return;
+    const fd = new FormData();
+    fd.set("branchId", branch.id);
+    startTransition(() => {
+      deleteBranch(fd);
     });
   }
 
@@ -138,7 +151,9 @@ export default function DashboardClient({
                   const director = directorNames[r.branch.id];
                   return (
                     <tr className="hoverable" key={r.branch.id}>
-                      <td className="dirname">{r.branch.name}</td>
+                      <td className="dirname">
+                        <BranchNameCell branch={r.branch} />
+                      </td>
                       <td>
                         <AssignDirectorCell branchId={r.branch.id} directorName={director} />
                       </td>
@@ -155,10 +170,17 @@ export default function DashboardClient({
                       </td>
                       <td>{r.rec?.next_date || "—"}</td>
                       <td>{items.length ? `${done} / ${items.length}` : "—"}</td>
-                      <td>
+                      <td style={{ display: "flex", gap: 6, alignItems: "center" }}>
                         <Link className="link-open" href={`/branch/${r.branch.id}`}>
                           Открыть →
                         </Link>
+                        <button
+                          className="btn danger small"
+                          onClick={() => handleDeleteBranch(r.branch)}
+                          disabled={isPending}
+                        >
+                          Удалить
+                        </button>
                       </td>
                     </tr>
                   );

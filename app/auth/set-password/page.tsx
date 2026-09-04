@@ -74,7 +74,10 @@ export default function SetPasswordPage() {
 
   return (
     <div className="gate">
-      <h1>Аттестация директоров ДЦ</h1>
+      <div className="brand" style={{ marginBottom: 6 }}>
+        <span className="brand-mark" aria-hidden="true" />
+        <h1>Аттестация директоров ДЦ</h1>
+      </div>
       <p className="lead">Придумайте пароль, чтобы войти в приложение.</p>
 
       <form className="gate-card" onSubmit={handleSubmit}>

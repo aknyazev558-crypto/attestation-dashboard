@@ -22,6 +22,7 @@ export default function Topbar({
       <div className="wrap">
         <div className="topbar-row">
           <div className="brand">
+            <span className="brand-mark" aria-hidden="true" />
             <h1>Аттестация директоров ДЦ</h1>
           </div>
           <div className="who">

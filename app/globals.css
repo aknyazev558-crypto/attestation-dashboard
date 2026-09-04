@@ -23,6 +23,8 @@
   --none: #8996a5;
   --none-bg: #eef1f5;
   --shadow: 0 1px 2px rgba(20, 28, 38, 0.06), 0 10px 28px -18px rgba(20, 28, 38, 0.3);
+  --brand-red: #d1352b;
+  --brand-navy-deep: #101a33;
 }
 
 * {
@@ -75,9 +77,13 @@ a {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--ground);
-  padding: 16px 0 12px;
-  border-bottom: 1px solid var(--line);
+  background: var(--brand-navy-deep);
+  padding: 14px 0 13px;
+  border-bottom: 3px solid var(--brand-red);
+  box-shadow: 0 2px 10px rgba(6, 10, 20, 0.25);
+}
+.topbar .wrap {
+  padding-bottom: 0;
 }
 .topbar-row {
   display: flex;
@@ -88,21 +94,31 @@ a {
 }
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
 }
-.brand h1 {
+.brand-mark {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--brand-red);
+  transform: rotate(45deg);
+  flex: none;
+}
+.topbar .brand h1 {
   font-family: "Oswald", Impact, sans-serif;
   font-weight: 600;
   font-size: 19px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   margin: 0;
-  color: var(--accent);
+  color: #ffffff;
+  white-space: nowrap;
 }
 .brand .tag {
   font-size: 12px;
-  color: var(--ink-3);
-  border: 1px solid var(--line);
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 2px;
   padding: 2px 7px;
   font-family: "JetBrains Mono", monospace;
@@ -112,10 +128,16 @@ a {
   align-items: center;
   gap: 10px;
   font-size: 13.5px;
-  color: var(--ink-2);
+  color: rgba(255, 255, 255, 0.65);
 }
 .who b {
-  color: var(--ink);
+  color: #ffffff;
+}
+.topbar .btn.ghost {
+  color: rgba(255, 255, 255, 0.75);
+}
+.topbar .btn.ghost:hover {
+  color: #ffffff;
 }
 .btn {
   background: var(--surface);

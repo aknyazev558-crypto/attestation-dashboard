@@ -20,6 +20,66 @@ export async function addBranch(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function renameBranch(formData: FormData) {
+  const branchId = String(formData.get("branchId") || "");
+  const name = String(formData.get("name") || "").trim();
+  const brandsRaw = String(formData.get("brands") || "");
+  if (!branchId || !name) {
+    return { error: "Укажите название филиала." };
+  }
+
+  const brands = brandsRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("branches")
+    .update({ name, brands })
+    .eq("id", branchId);
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/branch/${branchId}`);
+  return { ok: true };
+}
+
+export async function deleteBranch(formData: FormData) {
+  const branchId = String(formData.get("branchId") || "");
+  if (!branchId) {
+    return { error: "Филиал не указан." };
+  }
+
+  // Explicit gate rather than relying on RLS alone: with RLS blocking a
+  // non-owner, these calls would just silently affect 0 rows and this
+  // action would report success without actually doing anything.
+  const owner = await requireOwner();
+  if (!owner) {
+    return { error: "Только владелец сети может удалять филиалы." };
+  }
+
+  const supabase = await createClient();
+
+  // Branches has no ON DELETE CASCADE from attestations/ipr_items/profiles,
+  // so clear those out first — otherwise the delete below fails on a
+  // foreign key violation. Directors keep their account, just lose the
+  // branch link; attestation/ИПР history for the branch is gone for good.
+  await supabase.from("profiles").update({ branch_id: null }).eq("branch_id", branchId);
+  await supabase.from("ipr_items").delete().eq("branch_id", branchId);
+  await supabase.from("attestations").delete().eq("branch_id", branchId);
+
+  const { error } = await supabase.from("branches").delete().eq("id", branchId);
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 export async function createCycle(formData: FormData) {
   const label = String(formData.get("label") || "").trim();
   if (!label) return;
