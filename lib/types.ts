@@ -6,6 +6,11 @@ export function isOwnerLevel(role: Role | null | undefined): boolean {
 
 export type ScoreMap = Record<string, number | null>;
 
+// One column per staff member: staff user id -> their own competency ->
+// score map, so several staff members scoring the same director don't
+// share a single field the way manager_scores used to.
+export type StaffScoreMap = Record<string, ScoreMap>;
+
 export type Branch = {
   id: string;
   name: string;
@@ -31,7 +36,7 @@ export type Attestation = {
   branch_id: string;
   cycle: string;
   self_scores: ScoreMap;
-  staff_scores: ScoreMap;
+  staff_scores: StaffScoreMap;
   manager_scores: ScoreMap;
   self_submitted: boolean;
   achievement_1: string | null;

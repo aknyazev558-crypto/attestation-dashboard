@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Branch, Cycle, ScoringBlock } from "@/lib/types";
-import type { CompetencyWithDepartments } from "@/lib/competencies";
+import type { CompetencyWithDepartments, StaffMember } from "@/lib/competencies";
 import AttestationTab from "./AttestationTab";
 import IprTab from "./IprTab";
 
@@ -13,10 +13,11 @@ export default function BranchDetailClient({
   currentCycle,
   competencies,
   scoringBlocks,
+  staffList,
+  viewerId,
   isOwner,
   isCeo,
   isStaff,
-  staffBlockIds,
   isOwnDirector,
   directorFullName,
 }: {
@@ -25,10 +26,11 @@ export default function BranchDetailClient({
   currentCycle: string | null;
   competencies: CompetencyWithDepartments[];
   scoringBlocks: ScoringBlock[];
+  staffList: StaffMember[];
+  viewerId: string;
   isOwner: boolean;
   isCeo: boolean;
   isStaff: boolean;
-  staffBlockIds: string[];
   isOwnDirector: boolean;
   directorFullName: string | null;
 }) {
@@ -88,9 +90,10 @@ export default function BranchDetailClient({
           currentCycle={currentCycle}
           competencies={competencies}
           scoringBlocks={scoringBlocks}
+          staffList={staffList}
+          viewerId={viewerId}
           isOwner={isOwner}
           isCeo={isCeo}
-          staffBlockIds={staffBlockIds}
           isOwnDirector={isOwnDirector}
         />
       ) : (

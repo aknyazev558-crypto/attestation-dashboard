@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DEPARTMENTS, computeResult, nextQuarterLabel } from "@/lib/competencies";
-import type { CompetencyWithDepartments } from "@/lib/competencies";
+import type { CompetencyWithDepartments, StaffMember } from "@/lib/competencies";
 import type { Attestation, Cycle, ScoringBlock } from "@/lib/types";
 import { createCycle } from "@/app/dashboard/actions";
 
@@ -34,9 +34,10 @@ export default function AttestationTab({
   currentCycle,
   competencies,
   scoringBlocks,
+  staffList,
+  viewerId,
   isOwner,
   isCeo,
-  staffBlockIds,
   isOwnDirector,
 }: {
   branchId: string;
@@ -44,9 +45,10 @@ export default function AttestationTab({
   currentCycle: string | null;
   competencies: CompetencyWithDepartments[];
   scoringBlocks: ScoringBlock[];
+  staffList: StaffMember[];
+  viewerId: string;
   isOwner: boolean;
   isCeo: boolean;
-  staffBlockIds: string[];
   isOwnDirector: boolean;
 }) {
   const [selectedCycle, setSelectedCycle] = useState<string | null>(currentCycle);
@@ -84,15 +86,15 @@ export default function AttestationTab({
   // last in the Сотрудники → Руководитель сети → CEO order.
   const mgrEditable = isOwner && isCurrentCycle;
   const ceoEditable = isCeo && isCurrentCycle;
-  // Staff get their own "Оценка сотрудника" column instead, scoped per
-  // competency by its department(s) (Продажи, ППО, HR, ...) — a
-  // competency can belong to several at once, not by the scoring block
-  // (1-4) the row happens to fall under. A competency with no department
-  // assigned yet can't be scored by staff at all.
-  const canEditStaffScore = (comp: CompetencyWithDepartments) =>
+  // Each staff member gets their own column (headed with their name),
+  // scoped per competency by its department(s) (Продажи, ППО, HR, ...) — a
+  // competency can belong to several at once. Only that staff member can
+  // edit their own column; everyone else (owner/CEO, other staff, the
+  // director) sees it read-only, same as the self/manager columns.
+  const canEditStaffColumn = (staffMember: StaffMember, comp: CompetencyWithDepartments) =>
     isCurrentCycle &&
-    !isOwner &&
-    comp.department_ids.some((id) => staffBlockIds.includes(id));
+    viewerId === staffMember.id &&
+    comp.department_ids.some((id) => staffMember.departmentIds.includes(id));
 
   async function saveRecord(patch: Partial<Attestation>) {
     if (!record || !selectedCycle) return false;
@@ -248,7 +250,9 @@ export default function AttestationTab({
                   <tr>
                     <th>Компетенция</th>
                     <th>Самооценка</th>
-                    <th>Оценка сотрудника</th>
+                    {staffList.map((s) => (
+                      <th key={s.id}>{s.full_name || "Сотрудник"}</th>
+                    ))}
                     <th>Оценка руководителя</th>
                   </tr>
                 </thead>
@@ -259,14 +263,20 @@ export default function AttestationTab({
                       block={block}
                       rec={rec}
                       competencies={competencies}
+                      staffList={staffList}
                       selfEditable={selfEditable}
                       mgrEditable={mgrEditable}
-                      canEditStaffScore={canEditStaffScore}
+                      canEditStaffColumn={canEditStaffColumn}
                       onSelfChange={(compId, v) =>
                         saveRecord({ self_scores: { ...rec.self_scores, [compId]: v } })
                       }
-                      onStaffChange={(compId, v) =>
-                        saveRecord({ staff_scores: { ...rec.staff_scores, [compId]: v } })
+                      onStaffChange={(staffId, compId, v) =>
+                        saveRecord({
+                          staff_scores: {
+                            ...rec.staff_scores,
+                            [staffId]: { ...(rec.staff_scores[staffId] || {}), [compId]: v },
+                          },
+                        })
                       }
                       onMgrChange={(compId, v) =>
                         saveRecord({ manager_scores: { ...rec.manager_scores, [compId]: v } })
@@ -294,12 +304,13 @@ export default function AttestationTab({
               переводит в «Зону риска».
             </div>
             <div className="result-note">
-              Порядок оценки: сотрудники по своим блокам компетенций (колонка
-              «Оценка сотрудника») → Руководитель сети (предпоследним) → CEO
-              (последним) выставляют «Оценку руководителя» — она финальная
-              и попадает в итог. Пока «Оценка руководителя» не проставлена,
-              итог временно считается по оценке сотрудника, а если и её нет —
-              по самооценке. Ввод ничем не блокируется — это просто порядок,
+              Порядок оценки: сотрудники по своим блокам компетенций (у
+              каждого своя колонка, подписанная его именем) → Руководитель
+              сети (предпоследним) → CEO (последним) выставляют «Оценку
+              руководителя» — она финальная и попадает в итог. Пока «Оценка
+              руководителя» не проставлена, итог временно считается по
+              среднему из колонок сотрудников, а если и там пусто — по
+              самооценке. Ввод ничем не блокируется — это просто порядок,
               которого стоит придерживаться.
             </div>
           </div>
@@ -385,9 +396,10 @@ function BlockRows({
   block,
   rec,
   competencies,
+  staffList,
   selfEditable,
   mgrEditable,
-  canEditStaffScore,
+  canEditStaffColumn,
   onSelfChange,
   onStaffChange,
   onMgrChange,
@@ -395,18 +407,19 @@ function BlockRows({
   block: ScoringBlock;
   rec: Attestation;
   competencies: CompetencyWithDepartments[];
+  staffList: StaffMember[];
   selfEditable: boolean;
   mgrEditable: boolean;
-  canEditStaffScore: (comp: CompetencyWithDepartments) => boolean;
+  canEditStaffColumn: (staffMember: StaffMember, comp: CompetencyWithDepartments) => boolean;
   onSelfChange: (compId: string, v: number | null) => void;
-  onStaffChange: (compId: string, v: number | null) => void;
+  onStaffChange: (staffId: string, compId: string, v: number | null) => void;
   onMgrChange: (compId: string, v: number | null) => void;
 }) {
   const comps = competencies.filter((c) => c.block === block.id);
   return (
     <>
       <tr className="block-hdr">
-        <td colSpan={4}>
+        <td colSpan={3 + staffList.length}>
           {block.name} <span className="w">(вес {block.weight})</span>
         </td>
       </tr>
@@ -429,13 +442,15 @@ function BlockRows({
               onChange={(v) => onSelfChange(c.id, v)}
             />
           </td>
-          <td className="center">
-            <ScoreSelect
-              value={rec.staff_scores[c.id] ?? null}
-              editable={canEditStaffScore(c)}
-              onChange={(v) => onStaffChange(c.id, v)}
-            />
-          </td>
+          {staffList.map((s) => (
+            <td className="center" key={s.id}>
+              <ScoreSelect
+                value={rec.staff_scores[s.id]?.[c.id] ?? null}
+                editable={canEditStaffColumn(s, c)}
+                onChange={(v) => onStaffChange(s.id, c.id, v)}
+              />
+            </td>
+          ))}
           <td className="center">
             <ScoreSelect
               value={rec.manager_scores[c.id] ?? null}

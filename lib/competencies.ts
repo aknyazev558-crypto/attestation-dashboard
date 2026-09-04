@@ -60,6 +60,15 @@ export const DEPARTMENTS: Record<string, Department> = {
 
 export const DEPARTMENT_ORDER = ["sales", "ppo", "hr", "marketing", "kc", "cq", "findep"];
 
+// A staff member as shown on the attestation sheet: one scoring column per
+// person, headed with their name, editable only by that person and only
+// for competencies in a department they've been granted.
+export type StaffMember = {
+  id: string;
+  full_name: string | null;
+  departmentIds: string[];
+};
+
 export type Tone = "ok" | "accent" | "warn" | "crit" | "none";
 
 export interface AttestationResult {
@@ -79,7 +88,8 @@ export function computeResult(
     return { score: null, category: null, label: "Нет данных", tone: "none", forced: false };
   }
   const self: ScoreMap = record.self_scores || {};
-  const staff: ScoreMap = record.staff_scores || {};
+  const staff = record.staff_scores || {};
+  const staffMaps = Object.values(staff);
   const manager: ScoreMap = record.manager_scores || {};
 
   let weightedSum = 0;
@@ -97,14 +107,22 @@ export function computeResult(
     let compWeightUsed = 0;
     comps.forEach((c) => {
       // Final manager score wins; until owner/CEO enter it, fall back to
-      // the staff member's own column, then the director's self-score —
+      // the average of whichever staff members have scored this
+      // competency in their own column, then the director's self-score —
       // so a score already shows up as soon as anyone has entered one,
       // and gets replaced once the next stage (сотрудники → руководитель
       // сети → CEO) weighs in.
       const mgr = manager[c.id];
-      const st = staff[c.id];
+      const staffValues = staffMaps
+        .map((m) => m?.[c.id])
+        .filter((v): v is number => v != null && !Number.isNaN(Number(v)))
+        .map(Number);
+      const staffAvg = staffValues.length
+        ? staffValues.reduce((a, x) => a + x, 0) / staffValues.length
+        : null;
       const s = self[c.id];
-      const v = mgr != null ? Number(mgr) : st != null ? Number(st) : s != null ? Number(s) : null;
+      const v =
+        mgr != null ? Number(mgr) : staffAvg != null ? staffAvg : s != null ? Number(s) : null;
       if (v != null && !Number.isNaN(v)) {
         const w = c.weight || 1;
         compScoreWeighted += v * w;

@@ -5,6 +5,7 @@ import BranchDetailClient from "./BranchDetailClient";
 import { isOwnerLevel } from "@/lib/types";
 import type { Competency, CompetencyDepartment, Cycle, ScoringBlock } from "@/lib/types";
 import { attachDepartments } from "@/lib/competencies";
+import type { StaffMember } from "@/lib/competencies";
 
 export default async function BranchPage({
   params,
@@ -46,14 +47,24 @@ export default async function BranchPage({
     );
   }
 
-  let staffBlockIds: string[] = [];
-  if (isStaff) {
-    const { data: access } = await supabase
-      .from("staff_block_access")
-      .select("block_id")
-      .eq("user_id", user.id);
-    staffBlockIds = (access || []).map((a) => a.block_id);
-  }
+  const [{ data: staffProfiles }, { data: blockAccess }] = await Promise.all([
+    supabase.from("profiles").select("id, full_name").eq("role", "staff"),
+    supabase.from("staff_block_access").select("*"),
+  ]);
+
+  const departmentsByStaff: Record<string, string[]> = {};
+  (blockAccess || []).forEach((row) => {
+    const list = departmentsByStaff[row.user_id] || [];
+    list.push(row.block_id);
+    departmentsByStaff[row.user_id] = list;
+  });
+
+  // Only staff who actually have some department access get a column —
+  // an added-but-not-yet-granted staff member wouldn't be able to score
+  // anything anyway.
+  const staffList: StaffMember[] = (staffProfiles || [])
+    .map((p) => ({ id: p.id, full_name: p.full_name, departmentIds: departmentsByStaff[p.id] || [] }))
+    .filter((s) => s.departmentIds.length > 0);
 
   const { data: branch } = await supabase
     .from("branches")
@@ -106,10 +117,11 @@ export default async function BranchPage({
             (competencyDepartments as CompetencyDepartment[]) || []
           )}
           scoringBlocks={(scoringBlocks as ScoringBlock[]) || []}
+          staffList={staffList}
+          viewerId={user.id}
           isOwner={isOwner}
           isCeo={isCeo}
           isStaff={isStaff}
-          staffBlockIds={staffBlockIds}
           isOwnDirector={isOwnDirector}
           directorFullName={isOwnDirector ? profile.full_name : null}
         />
