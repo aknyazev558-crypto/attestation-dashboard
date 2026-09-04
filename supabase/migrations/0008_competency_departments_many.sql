@@ -13,7 +13,16 @@ insert into competency_departments (competency_id, department_id)
 select id, department_id from competencies where department_id is not null
 on conflict do nothing;
 
+-- Drop the old policy that reads competencies.department_id before
+-- dropping the column itself — otherwise Postgres refuses (2BP01,
+-- "cannot drop column ... because other objects depend on it").
+drop policy if exists "staff adds competency in own department" on competencies;
+drop policy if exists "staff adds competency" on competencies;
+
 alter table competencies drop column if exists department_id;
+
+create policy "staff adds competency" on competencies for insert
+  with check (is_staff() and block is null);
 
 alter table competency_departments enable row level security;
 
@@ -36,12 +45,3 @@ create policy "staff links competency to own department" on competency_departmen
       where user_id = auth.uid() and block_id = competency_departments.department_id
     )
   );
-
--- The 0007 insert policy referenced competencies.department_id, which no
--- longer exists — replace it. A staff member may still create the
--- competency row itself (name only, never with a scoring block); which
--- department(s) it belongs to is enforced by the join-table policy above.
-drop policy if exists "staff adds competency in own department" on competencies;
-drop policy if exists "staff adds competency" on competencies;
-create policy "staff adds competency" on competencies for insert
-  with check (is_staff() and block is null);
