@@ -102,6 +102,12 @@ export default function DashboardClient({
 
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+        <Link href="/dashboard/activity" className="btn ghost small">
+          Активность входов →
+        </Link>
+      </div>
+
       <AdminUsersPanel admins={admins} adminEmails={adminEmails} />
 
       <div className="stats">

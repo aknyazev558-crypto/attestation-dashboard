@@ -69,6 +69,12 @@ export type IprItem = {
   created_at: string;
 };
 
+export type LoginEvent = {
+  id: string;
+  user_id: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -100,6 +106,12 @@ export type Database = {
         Row: IprItem;
         Insert: Partial<IprItem> & { branch_id: string };
         Update: Partial<IprItem>;
+        Relationships: [];
+      };
+      login_events: {
+        Row: LoginEvent;
+        Insert: Partial<LoginEvent> & { user_id: string };
+        Update: Partial<LoginEvent>;
         Relationships: [];
       };
     };

@@ -28,7 +28,7 @@ function LoginForm() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -36,6 +36,11 @@ function LoginForm() {
     if (signInError) {
       setError("Неверный email или пароль.");
       return;
+    }
+    if (signInData.user) {
+      // Best-effort — a failed insert here shouldn't block the actual
+      // login, just mean this one visit is missing from the history.
+      supabase.from("login_events").insert({ user_id: signInData.user.id }).then();
     }
     router.push("/");
     router.refresh();
