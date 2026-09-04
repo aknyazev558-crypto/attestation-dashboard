@@ -1,6 +1,6 @@
-import type { Attestation, Competency, CompetencyDepartment, ScoreMap } from "@/lib/types";
+import type { Attestation, Competency, CompetencyDepartment, ScoreMap, ScoringBlock } from "@/lib/types";
 
-export type { Competency };
+export type { Competency, ScoringBlock };
 
 // A competency can belong to several blocks of competencies at once (a
 // many-to-many join in the DB) — this is the shape components actually
@@ -21,27 +21,27 @@ export function attachDepartments(
   return competencies.map((c) => ({ ...c, department_ids: byCompetency.get(c.id) || [] }));
 }
 
-export interface Block {
-  id: string;
-  name: string;
-  weight: number;
-}
-
-// The 4 weighted scoring blocks behind the итог/computeResult below — kept
-// exactly as before. Separate from the 7 department blocks (Продажи, ППО,
-// HR, Маркетинг, КЦ, CQ, FinDep) further down, which organize competencies
-// and staff edit access by function and don't carry a weight of their own;
-// a competency's scoring block and department are independent (a new one
-// added by staff starts with block = null — excluded from the weighted
-// total until owner/CEO assign it a block in the "Компетенции" panel).
-export const BLOCKS: Record<string, Block> = {
-  "1": { id: "1", name: "Бизнес-результат", weight: 0.35 },
-  "2": { id: "2", name: "Управление командой", weight: 0.25 },
-  "3": { id: "3", name: "Операционное управление", weight: 0.2 },
-  "4": { id: "4", name: "Личная эффективность и лидерство", weight: 0.2 },
-};
-
+// The 4 scoring blocks behind the итог/computeResult below. Their name and
+// weight are owner/CEO-editable (scoring_blocks table) — BLOCK_ORDER is
+// only the fixed set of ids (this app doesn't support adding/removing
+// scoring blocks, just reweighting/renaming the existing 4); actual
+// name/weight always comes from the fetched ScoringBlock[] passed around
+// as a prop, never from a hardcoded constant. Separate from the 7
+// department blocks (Продажи, ППО, HR, Маркетинг, КЦ, CQ, FinDep) further
+// down, which organize competencies and staff edit access by function and
+// don't carry a weight of their own; a competency's scoring block and
+// department are independent (a new one added by staff starts with
+// block = null — excluded from the weighted total until owner/CEO assign
+// it a block in the "Компетенции" panel).
 export const BLOCK_ORDER = ["1", "2", "3", "4"];
+
+export function blockMap(blocks: ScoringBlock[]): Record<string, ScoringBlock> {
+  const map: Record<string, ScoringBlock> = {};
+  blocks.forEach((b) => {
+    map[b.id] = b;
+  });
+  return map;
+}
 
 export interface Department {
   id: string;
@@ -72,7 +72,8 @@ export interface AttestationResult {
 
 export function computeResult(
   record: Pick<Attestation, "self_scores" | "manager_scores"> | null | undefined,
-  competencies: Competency[]
+  competencies: Competency[],
+  blocks: ScoringBlock[]
 ): AttestationResult {
   if (!record) {
     return { score: null, category: null, label: "Нет данных", tone: "none", forced: false };
@@ -84,21 +85,28 @@ export function computeResult(
   let weightUsed = 0;
   let forced = false;
 
-  for (const bid of BLOCK_ORDER) {
-    const block = BLOCKS[bid];
+  for (const block of blocks) {
+    const bid = block.id;
     const comps = competencies.filter((c) => c.block === bid);
-    const scores: number[] = [];
+    // Weighted average within the block — a competency's own `weight`
+    // (owner/CEO-editable, default 1) scales how much it counts relative
+    // to the others in the same block, before the block-level weight
+    // below is applied.
+    let compScoreWeighted = 0;
+    let compWeightUsed = 0;
     comps.forEach((c) => {
       const mgr = manager[c.id];
       const s = self[c.id];
       const v = mgr != null ? Number(mgr) : s != null ? Number(s) : null;
       if (v != null && !Number.isNaN(v)) {
-        scores.push(v);
+        const w = c.weight || 1;
+        compScoreWeighted += v * w;
+        compWeightUsed += w;
         if ((bid === "1" || bid === "3") && v === 1) forced = true;
       }
     });
-    if (scores.length) {
-      const avg = scores.reduce((a, x) => a + x, 0) / scores.length;
+    if (compWeightUsed > 0) {
+      const avg = compScoreWeighted / compWeightUsed;
       weightedSum += avg * block.weight;
       weightUsed += block.weight;
     }

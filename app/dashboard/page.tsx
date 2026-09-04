@@ -12,6 +12,7 @@ import type {
   Cycle,
   IprItem,
   Profile,
+  ScoringBlock,
 } from "@/lib/types";
 import { attachDepartments } from "@/lib/competencies";
 
@@ -45,6 +46,7 @@ export default async function DashboardPage() {
     { data: blockAccess },
     { data: competencies },
     { data: competencyDepartments },
+    { data: scoringBlocks },
   ] = await Promise.all([
     supabase.from("branches").select("*").order("name"),
     supabase.from("cycles").select("*").order("label"),
@@ -55,6 +57,7 @@ export default async function DashboardPage() {
     supabase.from("staff_block_access").select("*"),
     supabase.from("competencies").select("*").order("sort_order"),
     supabase.from("competency_departments").select("*"),
+    supabase.from("scoring_blocks").select("*").order("sort_order"),
   ]);
 
   const cycleList = (cycles as Cycle[]) || [];
@@ -126,6 +129,7 @@ export default async function DashboardPage() {
             (competencies as Competency[]) || [],
             (competencyDepartments as CompetencyDepartment[]) || []
           )}
+          scoringBlocks={(scoringBlocks as ScoringBlock[]) || []}
           viewerDepartmentIds={viewerDepartmentIds}
         />
       </div>

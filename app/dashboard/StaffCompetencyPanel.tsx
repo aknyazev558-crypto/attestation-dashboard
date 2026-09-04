@@ -2,16 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { addCompetency } from "./actions";
-import { BLOCKS, DEPARTMENTS } from "@/lib/competencies";
+import { DEPARTMENTS, blockMap } from "@/lib/competencies";
 import type { CompetencyWithDepartments } from "@/lib/competencies";
+import type { ScoringBlock } from "@/lib/types";
 
 export default function StaffCompetencyPanel({
   competencies,
+  scoringBlocks,
   departmentIds,
 }: {
   competencies: CompetencyWithDepartments[];
+  scoringBlocks: ScoringBlock[];
   departmentIds: string[];
 }) {
+  const blocks = blockMap(scoringBlocks);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>(departmentIds);
@@ -72,7 +76,7 @@ export default function StaffCompetencyPanel({
                   <td>{c.department_ids.map((id) => DEPARTMENTS[id]?.name || id).join(", ") || "—"}</td>
                   <td>
                     {c.block ? (
-                      <span className="badge ok">учитывается в «{BLOCKS[c.block]?.name}»</span>
+                      <span className="badge ok">учитывается в «{blocks[c.block]?.name}»</span>
                     ) : (
                       <span className="badge none">ожидает подтверждения</span>
                     )}

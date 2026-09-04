@@ -85,10 +85,20 @@ export type Competency = {
   id: string;
   block: string | null;
   name: string;
+  weight: number;
   is_custom: boolean;
   created_by: string | null;
   sort_order: number;
   created_at: string;
+};
+
+// The 4 weighted scoring blocks behind the итог/computeResult — id/name/
+// weight are now owner/CEO-editable (moved out of a hardcoded constant).
+export type ScoringBlock = {
+  id: string;
+  name: string;
+  weight: number;
+  sort_order: number;
 };
 
 // A competency can belong to more than one block of competencies —
@@ -153,6 +163,12 @@ export type Database = {
         Row: CompetencyDepartment;
         Insert: CompetencyDepartment;
         Update: Partial<CompetencyDepartment>;
+        Relationships: [];
+      };
+      scoring_blocks: {
+        Row: ScoringBlock;
+        Insert: Partial<ScoringBlock> & { id: string; name: string };
+        Update: Partial<ScoringBlock>;
         Relationships: [];
       };
     };

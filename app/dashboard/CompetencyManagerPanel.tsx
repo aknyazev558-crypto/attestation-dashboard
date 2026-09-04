@@ -2,17 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { addCompetency, deleteCompetency, updateCompetency } from "./actions";
-import { BLOCKS, BLOCK_ORDER, DEPARTMENTS, DEPARTMENT_ORDER } from "@/lib/competencies";
+import { DEPARTMENTS, DEPARTMENT_ORDER } from "@/lib/competencies";
 import type { CompetencyWithDepartments } from "@/lib/competencies";
+import type { ScoringBlock } from "@/lib/types";
 
 export default function CompetencyManagerPanel({
   competencies,
+  scoringBlocks,
 }: {
   competencies: CompetencyWithDepartments[];
+  scoringBlocks: ScoringBlock[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [block, setBlock] = useState("");
+  const [weight, setWeight] = useState("1");
   const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -27,6 +31,7 @@ export default function CompetencyManagerPanel({
     const fd = new FormData();
     fd.set("name", name);
     fd.set("block", block);
+    fd.set("weight", weight);
     departmentIds.forEach((id) => fd.append("departmentIds", id));
     startTransition(async () => {
       const result = await addCompetency(fd);
@@ -36,6 +41,7 @@ export default function CompetencyManagerPanel({
       }
       setName("");
       setBlock("");
+      setWeight("1");
       setDepartmentIds([]);
       setOpen(false);
     });
@@ -44,25 +50,36 @@ export default function CompetencyManagerPanel({
   function handleRename(comp: CompetencyWithDepartments) {
     const next = window.prompt("Название компетенции:", comp.name);
     if (!next || !next.trim() || next.trim() === comp.name) return;
-    saveRow(comp.id, next.trim(), comp.block, comp.department_ids);
+    saveRow(comp.id, next.trim(), comp.block, comp.weight, comp.department_ids);
   }
 
   function toggleRowDepartment(comp: CompetencyWithDepartments, id: string) {
     const next = comp.department_ids.includes(id)
       ? comp.department_ids.filter((d) => d !== id)
       : [...comp.department_ids, id];
-    saveRow(comp.id, comp.name, comp.block, next);
+    saveRow(comp.id, comp.name, comp.block, comp.weight, next);
   }
 
   function handleBlockChange(comp: CompetencyWithDepartments, value: string) {
-    saveRow(comp.id, comp.name, value, comp.department_ids);
+    saveRow(comp.id, comp.name, value, comp.weight, comp.department_ids);
   }
 
-  function saveRow(id: string, name: string, block: string | null, departmentIds: string[]) {
+  function handleWeightChange(comp: CompetencyWithDepartments, value: number) {
+    saveRow(comp.id, comp.name, comp.block, value, comp.department_ids);
+  }
+
+  function saveRow(
+    id: string,
+    name: string,
+    block: string | null,
+    weight: number,
+    departmentIds: string[]
+  ) {
     const fd = new FormData();
     fd.set("id", id);
     fd.set("name", name);
     fd.set("block", block || "");
+    fd.set("weight", String(weight));
     departmentIds.forEach((d) => fd.append("departmentIds", d));
     startTransition(() => {
       updateCompetency(fd);
@@ -88,9 +105,11 @@ export default function CompetencyManagerPanel({
       </div>
       <div className="field-note" style={{ margin: "0 16px 8px" }}>
         Распределение всех компетенций по блокам (Продажи, ППО, HR, Маркетинг, КЦ, CQ, FinDep — можно
-        отметить сразу несколько) и по весовым блокам итоговой оценки (Бизнес-результат и т.д.).
-        Компетенция без весового блока («—») не попадает в итоговый балл и не отображается в листе
-        аттестации, пока вы её не назначите.
+        отметить сразу несколько), по весовым блокам итоговой оценки (веса блоков — на карточке «Блоки
+        итоговой оценки» выше) и вес самой компетенции внутри её весового блока (чем выше — тем сильнее
+        влияет на среднее по блоку; по умолчанию 1 — все компетенции блока равны). Компетенция без
+        весового блока («—») не попадает в итоговый балл и не отображается в листе аттестации, пока вы
+        её не назначите.
       </div>
 
       {competencies.length > 0 && (
@@ -100,6 +119,7 @@ export default function CompetencyManagerPanel({
               <tr>
                 <th>Компетенция</th>
                 <th>Весовой блок (итог)</th>
+                <th>Вес в блоке</th>
                 <th>Блоки компетенций</th>
                 <th></th>
               </tr>
@@ -121,12 +141,19 @@ export default function CompetencyManagerPanel({
                       onChange={(e) => handleBlockChange(c, e.target.value)}
                     >
                       <option value="">— не в итоге —</option>
-                      {BLOCK_ORDER.map((id) => (
-                        <option key={id} value={id}>
-                          {BLOCKS[id].name}
+                      {scoringBlocks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td>
+                    <WeightInput
+                      value={c.weight}
+                      disabled={isPending}
+                      onSave={(v) => handleWeightChange(c, v)}
+                    />
                   </td>
                   <td>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -174,12 +201,21 @@ export default function CompetencyManagerPanel({
             <label className="field-note">Весовой блок (итоговая оценка)</label>
             <select value={block} onChange={(e) => setBlock(e.target.value)}>
               <option value="">— не в итоге —</option>
-              {BLOCK_ORDER.map((id) => (
-                <option key={id} value={id}>
-                  {BLOCKS[id].name}
+              {scoringBlocks.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
                 </option>
               ))}
             </select>
+            <label className="field-note">Вес в блоке (по умолчанию 1)</label>
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              style={{ width: 90 }}
+            />
             <label className="field-note">Блоки компетенций (можно несколько)</label>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {DEPARTMENT_ORDER.map((id) => (
@@ -210,5 +246,33 @@ export default function CompetencyManagerPanel({
         )}
       </div>
     </div>
+  );
+}
+
+function WeightInput({
+  value,
+  disabled,
+  onSave,
+}: {
+  value: number;
+  disabled: boolean;
+  onSave: (v: number) => void;
+}) {
+  const [local, setLocal] = useState(String(value));
+  return (
+    <input
+      type="number"
+      step="any"
+      min="0"
+      value={local}
+      disabled={disabled}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        const v = Number(local);
+        if (Number.isFinite(v) && v > 0 && v !== value) onSave(v);
+        else setLocal(String(value));
+      }}
+      style={{ width: 70 }}
+    />
   );
 }

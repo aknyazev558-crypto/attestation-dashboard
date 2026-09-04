@@ -470,11 +470,15 @@ export async function addCompetency(formData: FormData) {
     }
   }
 
+  const weightRaw = Number(String(formData.get("weight") || "").trim());
+  const weight = owner && Number.isFinite(weightRaw) && weightRaw > 0 ? weightRaw : 1;
+
   const { data: inserted, error } = await supabase
     .from("competencies")
     .insert({
       name,
       block: owner && BLOCK_ORDER.includes(blockRaw) ? blockRaw : null,
+      weight,
       is_custom: true,
       created_by: user.id,
     })
@@ -496,12 +500,17 @@ export async function updateCompetency(formData: FormData) {
   const id = String(formData.get("id") || "");
   const name = String(formData.get("name") || "").trim();
   const block = String(formData.get("block") || "").trim();
+  const weightRaw = String(formData.get("weight") || "").trim();
   const departmentIds = formData
     .getAll("departmentIds")
     .map((v) => String(v))
     .filter((did) => DEPARTMENT_ORDER.includes(did));
   if (!id || !name) {
     return { error: "Укажите название компетенции." };
+  }
+  const weight = Number(weightRaw);
+  if (!weightRaw || !Number.isFinite(weight) || weight <= 0) {
+    return { error: "Вес компетенции должен быть положительным числом." };
   }
 
   const requester = await requireOwnerLevel();
@@ -512,7 +521,7 @@ export async function updateCompetency(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("competencies")
-    .update({ name, block: BLOCK_ORDER.includes(block) ? block : null })
+    .update({ name, block: BLOCK_ORDER.includes(block) ? block : null, weight })
     .eq("id", id);
   if (error) return { error: error.message };
 
@@ -544,6 +553,32 @@ export async function deleteCompetency(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.from("competencies").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/branch", "layout");
+  return { ok: true };
+}
+
+export async function updateScoringBlock(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  const name = String(formData.get("name") || "").trim();
+  const weightRaw = String(formData.get("weight") || "").trim();
+  if (!id || !name) {
+    return { error: "Укажите название блока." };
+  }
+  const weight = Number(weightRaw);
+  if (!weightRaw || !Number.isFinite(weight) || weight <= 0) {
+    return { error: "Вес блока должен быть положительным числом." };
+  }
+
+  const requester = await requireOwnerLevel();
+  if (!requester) {
+    return { error: "Только владелец сети или CEO может изменять веса блоков." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("scoring_blocks").update({ name, weight }).eq("id", id);
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");

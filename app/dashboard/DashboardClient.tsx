@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { computeResult, nextQuarterLabel } from "@/lib/competencies";
 import type { CompetencyWithDepartments } from "@/lib/competencies";
-import type { Attestation, Branch, Cycle, IprItem, Profile } from "@/lib/types";
+import type { Attestation, Branch, Cycle, IprItem, Profile, ScoringBlock } from "@/lib/types";
 import { addBranch, createCycle, deleteBranch, setCurrentCycle } from "./actions";
 import AssignDirectorCell from "./AssignDirectorCell";
 import BranchNameCell from "./BranchNameCell";
@@ -13,6 +13,7 @@ import AdminUsersPanel from "./AdminUsersPanel";
 import StaffAccessPanel from "./StaffAccessPanel";
 import CompetencyManagerPanel from "./CompetencyManagerPanel";
 import StaffCompetencyPanel from "./StaffCompetencyPanel";
+import ScoringBlockPanel from "./ScoringBlockPanel";
 
 export default function DashboardClient({
   canManage,
@@ -29,6 +30,7 @@ export default function DashboardClient({
   staffEmails,
   staffBlocks,
   competencies,
+  scoringBlocks,
   viewerDepartmentIds,
 }: {
   canManage: boolean;
@@ -45,6 +47,7 @@ export default function DashboardClient({
   staffEmails: Record<string, string>;
   staffBlocks: Record<string, string[]>;
   competencies: CompetencyWithDepartments[];
+  scoringBlocks: ScoringBlock[];
   viewerDepartmentIds: string[];
 }) {
   const [isPending, startTransition] = useTransition();
@@ -74,7 +77,7 @@ export default function DashboardClient({
   const results = branches.map((b) => ({
     branch: b,
     rec: attByBranch.get(b.id) || null,
-    result: computeResult(attByBranch.get(b.id), competencies),
+    result: computeResult(attByBranch.get(b.id), competencies, scoringBlocks),
   }));
 
   const risky = results.filter((r) => r.result.tone === "warn" || r.result.tone === "crit").length;
@@ -132,12 +135,17 @@ export default function DashboardClient({
         <>
           <AdminUsersPanel admins={admins} adminEmails={adminEmails} />
           <StaffAccessPanel staff={staff} staffEmails={staffEmails} staffBlocks={staffBlocks} />
-          <CompetencyManagerPanel competencies={competencies} />
+          <ScoringBlockPanel scoringBlocks={scoringBlocks} />
+          <CompetencyManagerPanel competencies={competencies} scoringBlocks={scoringBlocks} />
         </>
       )}
 
       {isStaffViewer && (
-        <StaffCompetencyPanel competencies={competencies} departmentIds={viewerDepartmentIds} />
+        <StaffCompetencyPanel
+          competencies={competencies}
+          scoringBlocks={scoringBlocks}
+          departmentIds={viewerDepartmentIds}
+        />
       )}
 
       <div className="stats">

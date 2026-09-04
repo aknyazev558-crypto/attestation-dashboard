@@ -2,15 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  BLOCKS,
-  BLOCK_ORDER,
-  DEPARTMENTS,
-  computeResult,
-  nextQuarterLabel,
-} from "@/lib/competencies";
+import { DEPARTMENTS, computeResult, nextQuarterLabel } from "@/lib/competencies";
 import type { CompetencyWithDepartments } from "@/lib/competencies";
-import type { Attestation, Cycle } from "@/lib/types";
+import type { Attestation, Cycle, ScoringBlock } from "@/lib/types";
 import { createCycle } from "@/app/dashboard/actions";
 
 function blankRecord(branchId: string, cycle: string): Attestation {
@@ -38,6 +32,7 @@ export default function AttestationTab({
   cycles,
   currentCycle,
   competencies,
+  scoringBlocks,
   isOwner,
   isCeo,
   staffBlockIds,
@@ -47,6 +42,7 @@ export default function AttestationTab({
   cycles: Cycle[];
   currentCycle: string | null;
   competencies: CompetencyWithDepartments[];
+  scoringBlocks: ScoringBlock[];
   isOwner: boolean;
   isCeo: boolean;
   staffBlockIds: string[];
@@ -158,7 +154,8 @@ export default function AttestationTab({
   }
 
   const rec = record || blankRecord(branchId, selectedCycle || "");
-  const result = computeResult(rec, competencies);
+  const result = computeResult(rec, competencies, scoringBlocks);
+  const totalWeight = scoringBlocks.reduce((sum, b) => sum + b.weight, 0) || 1;
   const selfEditable = isOwnDirector && isCurrentCycle && !rec.self_submitted;
 
   async function submitSelfAssessment() {
@@ -249,10 +246,10 @@ export default function AttestationTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {BLOCK_ORDER.map((bid) => (
+                  {scoringBlocks.map((block) => (
                     <BlockRows
-                      key={bid}
-                      bid={bid}
+                      key={block.id}
+                      block={block}
                       rec={rec}
                       competencies={competencies}
                       selfEditable={selfEditable}
@@ -277,10 +274,13 @@ export default function AttestationTab({
             </div>
             <span className={"badge " + result.tone}>{result.label}</span>
             <div className="result-note">
-              Взвешенный балл считается по заполненным блокам (35% / 25% /
-              20% / 20%). Оценка «1» в блоках «Бизнес-результат» или
-              «Операционное управление» автоматически переводит в «Зону
-              риска».
+              Взвешенный балл считается по заполненным блокам (
+              {scoringBlocks
+                .map((b) => `${b.name} — ${Math.round((b.weight / totalWeight) * 100)}%`)
+                .join(", ")}
+              ). Внутри блока компетенции с разным весом усредняются пропорционально весу. Оценка
+              «1» в блоках «Бизнес-результат» или «Операционное управление» автоматически
+              переводит в «Зону риска».
             </div>
             <div className="result-note">
               Рекомендуемый порядок оценки руководителем: сотрудники по своим
@@ -368,7 +368,7 @@ export default function AttestationTab({
 }
 
 function BlockRows({
-  bid,
+  block,
   rec,
   competencies,
   selfEditable,
@@ -376,7 +376,7 @@ function BlockRows({
   onSelfChange,
   onMgrChange,
 }: {
-  bid: string;
+  block: ScoringBlock;
   rec: Attestation;
   competencies: CompetencyWithDepartments[];
   selfEditable: boolean;
@@ -384,19 +384,19 @@ function BlockRows({
   onSelfChange: (compId: string, v: number | null) => void;
   onMgrChange: (compId: string, v: number | null) => void;
 }) {
-  const block = BLOCKS[bid];
-  const comps = competencies.filter((c) => c.block === bid);
+  const comps = competencies.filter((c) => c.block === block.id);
   return (
     <>
       <tr className="block-hdr">
         <td colSpan={3}>
-          {block.name} <span className="w">(вес {Math.round(block.weight * 100)}%)</span>
+          {block.name} <span className="w">(вес {block.weight})</span>
         </td>
       </tr>
       {comps.map((c) => (
         <tr key={c.id}>
           <td className="compname">
             {c.name}
+            {c.weight !== 1 && <span className="w"> (вес {c.weight})</span>}
             {c.department_ids.length > 0 && (
               <span className="w">
                 {" "}
