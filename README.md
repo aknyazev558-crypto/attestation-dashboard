@@ -9,10 +9,17 @@ Next.js (App Router) + Supabase (Auth + Postgres + Row Level Security).
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
 Если разворачиваете с нуля — создайте проект на [supabase.com](https://supabase.com) и возьмите
-Project URL + anon/publishable key из Settings → API.
+из Settings → API: Project URL, anon/publishable key и **service_role (secret) key**.
+
+`SUPABASE_SERVICE_ROLE_KEY` — серверный секрет, полностью обходит RLS. Используется только в
+Server Actions (`app/dashboard/actions.ts`, функция `assignDirector`) для приглашения новых
+директоров через Supabase Auth Admin API. **Никогда** не добавляйте к нему префикс
+`NEXT_PUBLIC_` и не коммитьте в git — иначе он попадёт в браузерный бандл и любой сможет
+обойти защиту базы данных.
 
 ### Применить схему и RLS
 
@@ -34,17 +41,18 @@ npx supabase db push
 
 ### Создать пользователей (Фаза 3)
 
-Отдельной админ-панели нет — пользователи заводятся вручную:
+**Владельца** заводим один раз вручную (курицу и яйцо не обойти — назначать роли пока некому):
 
-1. Authentication → Users → **Invite user** → email директора/владельца. Человек получит
-   письмо со ссылкой для установки пароля (или задайте пароль сразу в Supabase Dashboard).
-2. Table Editor → `profiles` → добавить строку:
-   - `id` — скопировать id только что созданного пользователя из Authentication → Users
-   - `full_name` — ФИО
-   - `role` — `owner` или `director`
-   - `branch_id` — для директора: id нужного филиала из таблицы `branches`
-     (сначала нужно, чтобы в `branches` были строки — их можно добавить прямо в приложении,
-     будучи владельцем, на странице `/dashboard`).
+1. Authentication → Users → **Add user** (email + пароль, без письма — быстрее для первого
+   входа) или **Invite user** (письмо со ссылкой на установку пароля).
+2. Table Editor → `profiles` → добавить строку: `id` — скопировать id только что созданного
+   пользователя, `role = 'owner'`.
+
+**Директоров** дальше можно назначать прямо в приложении — на странице `/dashboard` в колонке
+«Директор» есть кнопка «Назначить» / «Изменить»: вводите email и ФИО, приложение через
+Supabase Auth Admin API отправляет директору письмо-приглашение и сразу создаёт для него
+профиль (`role='director'`, привязка к филиалу). Это работает только если задан
+`SUPABASE_SERVICE_ROLE_KEY` (см. выше) — без него кнопка вернёт ошибку с понятным текстом.
 
 ## 2. Запуск локально
 
@@ -88,8 +96,9 @@ proxy.ts                  — Next.js 16 Proxy (бывший middleware): ред
 
 1. Запушить код в GitHub-репозиторий.
 2. В Vercel — Import Project → выбрать репозиторий.
-3. Settings → Environment Variables — добавить `NEXT_PUBLIC_SUPABASE_URL` и
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+3. Settings → Environment Variables — добавить `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` и `SUPABASE_SERVICE_ROLE_KEY` (без `NEXT_PUBLIC_` —
+   должна остаться серверной).
 4. Deploy.
 
 ## 5. Проверка разграничения доступа (Фаза 6)

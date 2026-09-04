@@ -5,6 +5,7 @@ import Link from "next/link";
 import { computeResult, nextQuarterLabel } from "@/lib/competencies";
 import type { Attestation, Branch, Cycle, IprItem } from "@/lib/types";
 import { addBranch, createCycle, setCurrentCycle } from "./actions";
+import AssignDirectorCell from "./AssignDirectorCell";
 
 export default function DashboardClient({
   branches,
@@ -139,11 +140,7 @@ export default function DashboardClient({
                     <tr className="hoverable" key={r.branch.id}>
                       <td className="dirname">{r.branch.name}</td>
                       <td>
-                        {director ? (
-                          director
-                        ) : (
-                          <span className="dirname empty">Директор не назначен</span>
-                        )}
+                        <AssignDirectorCell branchId={r.branch.id} directorName={director} />
                       </td>
                       <td className="brands">{(r.branch.brands || []).join(", ")}</td>
                       <td>
