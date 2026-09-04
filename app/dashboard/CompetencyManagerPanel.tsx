@@ -3,23 +3,31 @@
 import { useState, useTransition } from "react";
 import { addCompetency, deleteCompetency, updateCompetency } from "./actions";
 import { BLOCKS, BLOCK_ORDER, DEPARTMENTS, DEPARTMENT_ORDER } from "@/lib/competencies";
-import type { Competency } from "@/lib/types";
+import type { CompetencyWithDepartments } from "@/lib/competencies";
 
-export default function CompetencyManagerPanel({ competencies }: { competencies: Competency[] }) {
+export default function CompetencyManagerPanel({
+  competencies,
+}: {
+  competencies: CompetencyWithDepartments[];
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [block, setBlock] = useState("");
-  const [departmentId, setDepartmentId] = useState(DEPARTMENT_ORDER[0]);
+  const [departmentIds, setDepartmentIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (departmentIds.length === 0) {
+      setError("Отметьте хотя бы один блок компетенций.");
+      return;
+    }
     const fd = new FormData();
     fd.set("name", name);
     fd.set("block", block);
-    fd.set("departmentId", departmentId);
+    departmentIds.forEach((id) => fd.append("departmentIds", id));
     startTransition(async () => {
       const result = await addCompetency(fd);
       if (result?.error) {
@@ -28,36 +36,43 @@ export default function CompetencyManagerPanel({ competencies }: { competencies:
       }
       setName("");
       setBlock("");
+      setDepartmentIds([]);
       setOpen(false);
     });
   }
 
-  function handleRename(comp: Competency) {
+  function handleRename(comp: CompetencyWithDepartments) {
     const next = window.prompt("Название компетенции:", comp.name);
     if (!next || !next.trim() || next.trim() === comp.name) return;
+    saveRow(comp.id, next.trim(), comp.block, comp.department_ids);
+  }
+
+  function toggleRowDepartment(comp: CompetencyWithDepartments, id: string) {
+    const next = comp.department_ids.includes(id)
+      ? comp.department_ids.filter((d) => d !== id)
+      : [...comp.department_ids, id];
+    saveRow(comp.id, comp.name, comp.block, next);
+  }
+
+  function handleBlockChange(comp: CompetencyWithDepartments, value: string) {
+    saveRow(comp.id, comp.name, value, comp.department_ids);
+  }
+
+  function saveRow(id: string, name: string, block: string | null, departmentIds: string[]) {
     const fd = new FormData();
-    fd.set("id", comp.id);
-    fd.set("name", next.trim());
-    fd.set("block", comp.block || "");
-    fd.set("departmentId", comp.department_id || "");
+    fd.set("id", id);
+    fd.set("name", name);
+    fd.set("block", block || "");
+    departmentIds.forEach((d) => fd.append("departmentIds", d));
     startTransition(() => {
       updateCompetency(fd);
     });
   }
 
-  function handleFieldChange(comp: Competency, field: "block" | "departmentId", value: string) {
-    const fd = new FormData();
-    fd.set("id", comp.id);
-    fd.set("name", comp.name);
-    fd.set("block", field === "block" ? value : comp.block || "");
-    fd.set("departmentId", field === "departmentId" ? value : comp.department_id || "");
-    startTransition(() => {
-      updateCompetency(fd);
-    });
-  }
-
-  function handleDelete(comp: Competency) {
-    const ok = window.confirm(`Удалить компетенцию «${comp.name}»? Её оценки за все кварталы пропадут из истории.`);
+  function handleDelete(comp: CompetencyWithDepartments) {
+    const ok = window.confirm(
+      `Удалить компетенцию «${comp.name}»? Её оценки за все кварталы пропадут из истории.`
+    );
     if (!ok) return;
     const fd = new FormData();
     fd.set("id", comp.id);
@@ -72,10 +87,10 @@ export default function CompetencyManagerPanel({ competencies }: { competencies:
         <h2>Компетенции</h2>
       </div>
       <div className="field-note" style={{ margin: "0 16px 8px" }}>
-        Распределение всех компетенций по блокам (Продажи, ППО, HR, Маркетинг, КЦ, CQ, FinDep) и по
-        весовым блокам итоговой оценки (Бизнес-результат и т.д.). Компетенция без весового блока
-        («—») не попадает в итоговый балл и не отображается в листе аттестации, пока вы её не
-        назначите.
+        Распределение всех компетенций по блокам (Продажи, ППО, HR, Маркетинг, КЦ, CQ, FinDep — можно
+        отметить сразу несколько) и по весовым блокам итоговой оценки (Бизнес-результат и т.д.).
+        Компетенция без весового блока («—») не попадает в итоговый балл и не отображается в листе
+        аттестации, пока вы её не назначите.
       </div>
 
       {competencies.length > 0 && (
@@ -85,7 +100,7 @@ export default function CompetencyManagerPanel({ competencies }: { competencies:
               <tr>
                 <th>Компетенция</th>
                 <th>Весовой блок (итог)</th>
-                <th>Блок компетенций</th>
+                <th>Блоки компетенций</th>
                 <th></th>
               </tr>
             </thead>
@@ -103,7 +118,7 @@ export default function CompetencyManagerPanel({ competencies }: { competencies:
                     <select
                       value={c.block || ""}
                       disabled={isPending}
-                      onChange={(e) => handleFieldChange(c, "block", e.target.value)}
+                      onChange={(e) => handleBlockChange(c, e.target.value)}
                     >
                       <option value="">— не в итоге —</option>
                       {BLOCK_ORDER.map((id) => (
@@ -114,18 +129,22 @@ export default function CompetencyManagerPanel({ competencies }: { competencies:
                     </select>
                   </td>
                   <td>
-                    <select
-                      value={c.department_id || ""}
-                      disabled={isPending}
-                      onChange={(e) => handleFieldChange(c, "departmentId", e.target.value)}
-                    >
-                      <option value="">— не назначен —</option>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       {DEPARTMENT_ORDER.map((id) => (
-                        <option key={id} value={id}>
+                        <label
+                          key={id}
+                          style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5 }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={c.department_ids.includes(id)}
+                            disabled={isPending}
+                            onChange={() => toggleRowDepartment(c, id)}
+                          />
                           {DEPARTMENTS[id].name}
-                        </option>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </td>
                   <td>
                     <button className="btn danger small" onClick={() => handleDelete(c)} disabled={isPending}>
@@ -161,14 +180,23 @@ export default function CompetencyManagerPanel({ competencies }: { competencies:
                 </option>
               ))}
             </select>
-            <label className="field-note">Блок компетенций</label>
-            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+            <label className="field-note">Блоки компетенций (можно несколько)</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {DEPARTMENT_ORDER.map((id) => (
-                <option key={id} value={id}>
+                <label key={id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={departmentIds.includes(id)}
+                    onChange={() =>
+                      setDepartmentIds((prev) =>
+                        prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+                      )
+                    }
+                  />
                   {DEPARTMENTS[id].name}
-                </option>
+                </label>
               ))}
-            </select>
+            </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button className="btn small primary" type="submit" disabled={isPending}>
                 {isPending ? "Сохранение…" : "Добавить"}

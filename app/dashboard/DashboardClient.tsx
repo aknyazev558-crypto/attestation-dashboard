@@ -4,7 +4,8 @@ import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { computeResult, nextQuarterLabel } from "@/lib/competencies";
-import type { Attestation, Branch, Competency, Cycle, IprItem, Profile } from "@/lib/types";
+import type { CompetencyWithDepartments } from "@/lib/competencies";
+import type { Attestation, Branch, Cycle, IprItem, Profile } from "@/lib/types";
 import { addBranch, createCycle, deleteBranch, setCurrentCycle } from "./actions";
 import AssignDirectorCell from "./AssignDirectorCell";
 import BranchNameCell from "./BranchNameCell";
@@ -43,7 +44,7 @@ export default function DashboardClient({
   staff: Profile[];
   staffEmails: Record<string, string>;
   staffBlocks: Record<string, string[]>;
-  competencies: Competency[];
+  competencies: CompetencyWithDepartments[];
   viewerDepartmentIds: string[];
 }) {
   const [isPending, startTransition] = useTransition();

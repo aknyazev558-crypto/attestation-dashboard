@@ -9,7 +9,8 @@ import {
   computeResult,
   nextQuarterLabel,
 } from "@/lib/competencies";
-import type { Attestation, Competency, Cycle } from "@/lib/types";
+import type { CompetencyWithDepartments } from "@/lib/competencies";
+import type { Attestation, Cycle } from "@/lib/types";
 import { createCycle } from "@/app/dashboard/actions";
 
 function blankRecord(branchId: string, cycle: string): Attestation {
@@ -45,7 +46,7 @@ export default function AttestationTab({
   branchId: string;
   cycles: Cycle[];
   currentCycle: string | null;
-  competencies: Competency[];
+  competencies: CompetencyWithDepartments[];
   isOwner: boolean;
   isCeo: boolean;
   staffBlockIds: string[];
@@ -84,13 +85,13 @@ export default function AttestationTab({
   const isCurrentCycle = selectedCycle === currentCycle;
   const mgrEditable = isOwner && isCurrentCycle;
   const ceoEditable = isCeo && isCurrentCycle;
-  // Staff edit access is scoped per competency by its department (Продажи,
-  // ППО, HR, ...), not by the scoring block (1-4) the row happens to fall
-  // under — a competency with no department assigned yet (owner/CEO hasn't
-  // sorted it via the "Компетенции" panel) can't be edited by staff at all.
-  const canEditCompetency = (comp: Competency) =>
+  // Staff edit access is scoped per competency by its department(s)
+  // (Продажи, ППО, HR, ...) — a competency can belong to several at once —
+  // not by the scoring block (1-4) the row happens to fall under. A
+  // competency with no department assigned yet can't be edited by staff.
+  const canEditCompetency = (comp: CompetencyWithDepartments) =>
     isCurrentCycle &&
-    (isOwner || (!!comp.department_id && staffBlockIds.includes(comp.department_id)));
+    (isOwner || comp.department_ids.some((id) => staffBlockIds.includes(id)));
 
   async function saveRecord(patch: Partial<Attestation>) {
     if (!record || !selectedCycle) return false;
@@ -377,9 +378,9 @@ function BlockRows({
 }: {
   bid: string;
   rec: Attestation;
-  competencies: Competency[];
+  competencies: CompetencyWithDepartments[];
   selfEditable: boolean;
-  canEditCompetency: (comp: Competency) => boolean;
+  canEditCompetency: (comp: CompetencyWithDepartments) => boolean;
   onSelfChange: (compId: string, v: number | null) => void;
   onMgrChange: (compId: string, v: number | null) => void;
 }) {
@@ -396,8 +397,11 @@ function BlockRows({
         <tr key={c.id}>
           <td className="compname">
             {c.name}
-            {c.department_id && (
-              <span className="w"> · {DEPARTMENTS[c.department_id]?.name || c.department_id}</span>
+            {c.department_ids.length > 0 && (
+              <span className="w">
+                {" "}
+                · {c.department_ids.map((id) => DEPARTMENTS[id]?.name || id).join(", ")}
+              </span>
             )}
           </td>
           <td className="center">

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import Topbar from "@/app/components/Topbar";
 import BranchDetailClient from "./BranchDetailClient";
 import { isOwnerLevel } from "@/lib/types";
-import type { Competency, Cycle } from "@/lib/types";
+import type { Competency, CompetencyDepartment, Cycle } from "@/lib/types";
+import { attachDepartments } from "@/lib/competencies";
 
 export default async function BranchPage({
   params,
@@ -72,6 +73,10 @@ export default async function BranchPage({
     .select("*")
     .order("sort_order");
 
+  const { data: competencyDepartments } = await supabase
+    .from("competency_departments")
+    .select("*");
+
   const cycleList = (cycles as Cycle[]) || [];
   const currentCycle = cycleList.find((c) => c.is_current)?.label || null;
 
@@ -91,7 +96,10 @@ export default async function BranchPage({
           branch={branch}
           cycles={cycleList}
           currentCycle={currentCycle}
-          competencies={(competencies as Competency[]) || []}
+          competencies={attachDepartments(
+            (competencies as Competency[]) || [],
+            (competencyDepartments as CompetencyDepartment[]) || []
+          )}
           isOwner={isOwner}
           isCeo={isCeo}
           isStaff={isStaff}

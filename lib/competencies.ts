@@ -1,6 +1,25 @@
-import type { Attestation, Competency, ScoreMap } from "@/lib/types";
+import type { Attestation, Competency, CompetencyDepartment, ScoreMap } from "@/lib/types";
 
 export type { Competency };
+
+// A competency can belong to several blocks of competencies at once (a
+// many-to-many join in the DB) — this is the shape components actually
+// work with, built by attachDepartments() below from the raw competencies
+// + competency_departments rows fetched server-side.
+export type CompetencyWithDepartments = Competency & { department_ids: string[] };
+
+export function attachDepartments(
+  competencies: Competency[],
+  links: CompetencyDepartment[]
+): CompetencyWithDepartments[] {
+  const byCompetency = new Map<string, string[]>();
+  links.forEach((link) => {
+    const list = byCompetency.get(link.competency_id) || [];
+    list.push(link.department_id);
+    byCompetency.set(link.competency_id, list);
+  });
+  return competencies.map((c) => ({ ...c, department_ids: byCompetency.get(c.id) || [] }));
+}
 
 export interface Block {
   id: string;

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Branch, Competency, Cycle } from "@/lib/types";
+import type { Branch, Cycle } from "@/lib/types";
+import type { CompetencyWithDepartments } from "@/lib/competencies";
 import AttestationTab from "./AttestationTab";
 import IprTab from "./IprTab";
 
@@ -21,7 +22,7 @@ export default function BranchDetailClient({
   branch: Branch;
   cycles: Cycle[];
   currentCycle: string | null;
-  competencies: Competency[];
+  competencies: CompetencyWithDepartments[];
   isOwner: boolean;
   isCeo: boolean;
   isStaff: boolean;

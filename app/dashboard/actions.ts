@@ -422,19 +422,23 @@ export async function removeStaff(formData: FormData) {
 }
 
 /**
- * Owner/CEO add any competency straight into any department/scoring block.
- * A staff member can also add one, but only within a department they've
- * been granted (checked here and, redundantly, by RLS) — it's always
- * created with no scoring block (`block: null`), i.e. not yet counted in
- * the weighted total, until owner/CEO assign one from the manager panel.
+ * Owner/CEO add any competency straight into any department(s)/scoring
+ * block — a competency can belong to more than one department at once. A
+ * staff member can also add one, but only into department(s) they've been
+ * granted (checked here and, redundantly, by RLS) — it's always created
+ * with no scoring block (`block: null`), i.e. not yet counted in the
+ * weighted total, until owner/CEO assign one from the manager panel.
  */
 export async function addCompetency(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
-  const departmentId = String(formData.get("departmentId") || "").trim();
+  const departmentIds = formData
+    .getAll("departmentIds")
+    .map((v) => String(v))
+    .filter((id) => DEPARTMENT_ORDER.includes(id));
   const blockRaw = String(formData.get("block") || "").trim();
 
-  if (!name || !departmentId || !DEPARTMENT_ORDER.includes(departmentId)) {
-    return { error: "Укажите название компетенции и блок." };
+  if (!name || departmentIds.length === 0) {
+    return { error: "Укажите название компетенции и хотя бы один блок." };
   }
 
   const supabase = await createClient();
@@ -459,22 +463,29 @@ export async function addCompetency(formData: FormData) {
     const { data: access } = await supabase
       .from("staff_block_access")
       .select("block_id")
-      .eq("user_id", user.id)
-      .eq("block_id", departmentId)
-      .maybeSingle();
-    if (!access) {
-      return { error: "У вас нет доступа к этому блоку компетенций." };
+      .eq("user_id", user.id);
+    const granted = new Set((access || []).map((a) => a.block_id));
+    if (departmentIds.some((id) => !granted.has(id))) {
+      return { error: "У вас нет доступа к одному из выбранных блоков компетенций." };
     }
   }
 
-  const { error } = await supabase.from("competencies").insert({
-    name,
-    department_id: departmentId,
-    block: owner && BLOCK_ORDER.includes(blockRaw) ? blockRaw : null,
-    is_custom: true,
-    created_by: user.id,
-  });
-  if (error) return { error: error.message };
+  const { data: inserted, error } = await supabase
+    .from("competencies")
+    .insert({
+      name,
+      block: owner && BLOCK_ORDER.includes(blockRaw) ? blockRaw : null,
+      is_custom: true,
+      created_by: user.id,
+    })
+    .select()
+    .single();
+  if (error || !inserted) return { error: error?.message || "Не удалось добавить компетенцию." };
+
+  const { error: linkError } = await supabase
+    .from("competency_departments")
+    .insert(departmentIds.map((department_id) => ({ competency_id: inserted.id, department_id })));
+  if (linkError) return { error: linkError.message };
 
   revalidatePath("/dashboard");
   revalidatePath("/branch", "layout");
@@ -485,7 +496,10 @@ export async function updateCompetency(formData: FormData) {
   const id = String(formData.get("id") || "");
   const name = String(formData.get("name") || "").trim();
   const block = String(formData.get("block") || "").trim();
-  const departmentId = String(formData.get("departmentId") || "").trim();
+  const departmentIds = formData
+    .getAll("departmentIds")
+    .map((v) => String(v))
+    .filter((did) => DEPARTMENT_ORDER.includes(did));
   if (!id || !name) {
     return { error: "Укажите название компетенции." };
   }
@@ -498,13 +512,19 @@ export async function updateCompetency(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("competencies")
-    .update({
-      name,
-      block: BLOCK_ORDER.includes(block) ? block : null,
-      department_id: DEPARTMENT_ORDER.includes(departmentId) ? departmentId : null,
-    })
+    .update({ name, block: BLOCK_ORDER.includes(block) ? block : null })
     .eq("id", id);
   if (error) return { error: error.message };
+
+  // Replace this competency's department set wholesale — simpler than
+  // diffing, same approach as staff block-access reassignment.
+  await supabase.from("competency_departments").delete().eq("competency_id", id);
+  if (departmentIds.length) {
+    const { error: linkError } = await supabase
+      .from("competency_departments")
+      .insert(departmentIds.map((department_id) => ({ competency_id: id, department_id })));
+    if (linkError) return { error: linkError.message };
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/branch", "layout");

@@ -3,31 +3,35 @@
 import { useState, useTransition } from "react";
 import { addCompetency } from "./actions";
 import { BLOCKS, DEPARTMENTS } from "@/lib/competencies";
-import type { Competency } from "@/lib/types";
+import type { CompetencyWithDepartments } from "@/lib/competencies";
 
 export default function StaffCompetencyPanel({
   competencies,
   departmentIds,
 }: {
-  competencies: Competency[];
+  competencies: CompetencyWithDepartments[];
   departmentIds: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [departmentId, setDepartmentId] = useState(departmentIds[0] || "");
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>(departmentIds);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   if (departmentIds.length === 0) return null;
 
-  const own = competencies.filter((c) => c.department_id && departmentIds.includes(c.department_id));
+  const own = competencies.filter((c) => c.department_ids.some((id) => departmentIds.includes(id)));
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (selectedDepartments.length === 0) {
+      setError("Отметьте хотя бы один блок.");
+      return;
+    }
     const fd = new FormData();
     fd.set("name", name);
-    fd.set("departmentId", departmentId);
+    selectedDepartments.forEach((id) => fd.append("departmentIds", id));
     startTransition(async () => {
       const result = await addCompetency(fd);
       if (result?.error) {
@@ -57,7 +61,7 @@ export default function StaffCompetencyPanel({
             <thead>
               <tr>
                 <th>Компетенция</th>
-                <th>Блок</th>
+                <th>Блоки</th>
                 <th>Статус</th>
               </tr>
             </thead>
@@ -65,7 +69,7 @@ export default function StaffCompetencyPanel({
               {own.map((c) => (
                 <tr key={c.id}>
                   <td className="compname">{c.name}</td>
-                  <td>{DEPARTMENTS[c.department_id || ""]?.name || "—"}</td>
+                  <td>{c.department_ids.map((id) => DEPARTMENTS[id]?.name || id).join(", ") || "—"}</td>
                   <td>
                     {c.block ? (
                       <span className="badge ok">учитывается в «{BLOCKS[c.block]?.name}»</span>
@@ -94,13 +98,25 @@ export default function StaffCompetencyPanel({
               onChange={(e) => setName(e.target.value)}
             />
             {departmentIds.length > 1 && (
-              <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-                {departmentIds.map((id) => (
-                  <option key={id} value={id}>
-                    {DEPARTMENTS[id]?.name || id}
-                  </option>
-                ))}
-              </select>
+              <>
+                <div className="field-note">Блоки (можно несколько из ваших доступных)</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {departmentIds.map((id) => (
+                    <label key={id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDepartments.includes(id)}
+                        onChange={() =>
+                          setSelectedDepartments((prev) =>
+                            prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+                          )
+                        }
+                      />
+                      {DEPARTMENTS[id]?.name || id}
+                    </label>
+                  ))}
+                </div>
+              </>
             )}
             <div style={{ display: "flex", gap: 6 }}>
               <button className="btn small primary" type="submit" disabled={isPending}>

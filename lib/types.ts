@@ -84,12 +84,18 @@ export type StaffBlockAccess = {
 export type Competency = {
   id: string;
   block: string | null;
-  department_id: string | null;
   name: string;
   is_custom: boolean;
   created_by: string | null;
   sort_order: number;
   created_at: string;
+};
+
+// A competency can belong to more than one block of competencies —
+// many-to-many join, separate from the (single) scoring block above.
+export type CompetencyDepartment = {
+  competency_id: string;
+  department_id: string;
 };
 
 export type Database = {
@@ -139,8 +145,14 @@ export type Database = {
       };
       competencies: {
         Row: Competency;
-        Insert: Partial<Competency> & { name: string; department_id: string };
+        Insert: Partial<Competency> & { name: string };
         Update: Partial<Competency>;
+        Relationships: [];
+      };
+      competency_departments: {
+        Row: CompetencyDepartment;
+        Insert: CompetencyDepartment;
+        Update: Partial<CompetencyDepartment>;
         Relationships: [];
       };
     };

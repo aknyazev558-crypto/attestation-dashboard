@@ -4,7 +4,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Topbar from "@/app/components/Topbar";
 import DashboardClient from "./DashboardClient";
 import { isOwnerLevel } from "@/lib/types";
-import type { Attestation, Branch, Competency, Cycle, IprItem, Profile } from "@/lib/types";
+import type {
+  Attestation,
+  Branch,
+  Competency,
+  CompetencyDepartment,
+  Cycle,
+  IprItem,
+  Profile,
+} from "@/lib/types";
+import { attachDepartments } from "@/lib/competencies";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -35,6 +44,7 @@ export default async function DashboardPage() {
     { data: staff },
     { data: blockAccess },
     { data: competencies },
+    { data: competencyDepartments },
   ] = await Promise.all([
     supabase.from("branches").select("*").order("name"),
     supabase.from("cycles").select("*").order("label"),
@@ -44,6 +54,7 @@ export default async function DashboardPage() {
     supabase.from("profiles").select("*").eq("role", "staff"),
     supabase.from("staff_block_access").select("*"),
     supabase.from("competencies").select("*").order("sort_order"),
+    supabase.from("competency_departments").select("*"),
   ]);
 
   const cycleList = (cycles as Cycle[]) || [];
@@ -111,7 +122,10 @@ export default async function DashboardPage() {
           staff={(staff as Profile[]) || []}
           staffEmails={userEmails}
           staffBlocks={staffBlocks}
-          competencies={(competencies as Competency[]) || []}
+          competencies={attachDepartments(
+            (competencies as Competency[]) || [],
+            (competencyDepartments as CompetencyDepartment[]) || []
+          )}
           viewerDepartmentIds={viewerDepartmentIds}
         />
       </div>
