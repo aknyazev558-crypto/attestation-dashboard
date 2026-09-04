@@ -11,7 +11,7 @@ function randomPassword() {
   return out;
 }
 
-const ROLE_LABEL: Record<string, string> = { owner: "Владелец сети", ceo: "CEO" };
+const ROLE_LABEL: Record<string, string> = { owner: "Руководитель сети", ceo: "CEO" };
 
 export default function AdminUsersPanel({
   admins,
@@ -127,7 +127,7 @@ export default function AdminUsersPanel({
             />
             <select value={role} onChange={(e) => setRole(e.target.value as "owner" | "ceo")}>
               <option value="ceo">CEO</option>
-              <option value="owner">Владелец сети</option>
+              <option value="owner">Руководитель сети</option>
             </select>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
               <input
