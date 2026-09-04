@@ -71,7 +71,7 @@ export interface AttestationResult {
 }
 
 export function computeResult(
-  record: Pick<Attestation, "self_scores" | "manager_scores"> | null | undefined,
+  record: Pick<Attestation, "self_scores" | "staff_scores" | "manager_scores"> | null | undefined,
   competencies: Competency[],
   blocks: ScoringBlock[]
 ): AttestationResult {
@@ -79,6 +79,7 @@ export function computeResult(
     return { score: null, category: null, label: "Нет данных", tone: "none", forced: false };
   }
   const self: ScoreMap = record.self_scores || {};
+  const staff: ScoreMap = record.staff_scores || {};
   const manager: ScoreMap = record.manager_scores || {};
 
   let weightedSum = 0;
@@ -95,9 +96,15 @@ export function computeResult(
     let compScoreWeighted = 0;
     let compWeightUsed = 0;
     comps.forEach((c) => {
+      // Final manager score wins; until owner/CEO enter it, fall back to
+      // the staff member's own column, then the director's self-score —
+      // so a score already shows up as soon as anyone has entered one,
+      // and gets replaced once the next stage (сотрудники → руководитель
+      // сети → CEO) weighs in.
       const mgr = manager[c.id];
+      const st = staff[c.id];
       const s = self[c.id];
-      const v = mgr != null ? Number(mgr) : s != null ? Number(s) : null;
+      const v = mgr != null ? Number(mgr) : st != null ? Number(st) : s != null ? Number(s) : null;
       if (v != null && !Number.isNaN(v)) {
         const w = c.weight || 1;
         compScoreWeighted += v * w;

@@ -13,6 +13,7 @@ function blankRecord(branchId: string, cycle: string): Attestation {
     branch_id: branchId,
     cycle,
     self_scores: {},
+    staff_scores: {},
     manager_scores: {},
     self_submitted: false,
     achievement_1: "",
@@ -79,15 +80,19 @@ export default function AttestationTab({
   }, [branchId, selectedCycle]);
 
   const isCurrentCycle = selectedCycle === currentCycle;
+  // "Оценка руководителя" is the final score — owner/CEO only, entered
+  // last in the Сотрудники → Руководитель сети → CEO order.
   const mgrEditable = isOwner && isCurrentCycle;
   const ceoEditable = isCeo && isCurrentCycle;
-  // Staff edit access is scoped per competency by its department(s)
-  // (Продажи, ППО, HR, ...) — a competency can belong to several at once —
-  // not by the scoring block (1-4) the row happens to fall under. A
-  // competency with no department assigned yet can't be edited by staff.
-  const canEditCompetency = (comp: CompetencyWithDepartments) =>
+  // Staff get their own "Оценка сотрудника" column instead, scoped per
+  // competency by its department(s) (Продажи, ППО, HR, ...) — a
+  // competency can belong to several at once, not by the scoring block
+  // (1-4) the row happens to fall under. A competency with no department
+  // assigned yet can't be scored by staff at all.
+  const canEditStaffScore = (comp: CompetencyWithDepartments) =>
     isCurrentCycle &&
-    (isOwner || comp.department_ids.some((id) => staffBlockIds.includes(id)));
+    !isOwner &&
+    comp.department_ids.some((id) => staffBlockIds.includes(id));
 
   async function saveRecord(patch: Partial<Attestation>) {
     if (!record || !selectedCycle) return false;
@@ -102,6 +107,7 @@ export default function AttestationTab({
           branch_id: branchId,
           cycle: selectedCycle,
           self_scores: next.self_scores,
+          staff_scores: next.staff_scores,
           manager_scores: next.manager_scores,
           self_submitted: next.self_submitted,
           achievement_1: next.achievement_1,
@@ -242,6 +248,7 @@ export default function AttestationTab({
                   <tr>
                     <th>Компетенция</th>
                     <th>Самооценка</th>
+                    <th>Оценка сотрудника</th>
                     <th>Оценка руководителя</th>
                   </tr>
                 </thead>
@@ -253,9 +260,13 @@ export default function AttestationTab({
                       rec={rec}
                       competencies={competencies}
                       selfEditable={selfEditable}
-                      canEditCompetency={canEditCompetency}
+                      mgrEditable={mgrEditable}
+                      canEditStaffScore={canEditStaffScore}
                       onSelfChange={(compId, v) =>
                         saveRecord({ self_scores: { ...rec.self_scores, [compId]: v } })
+                      }
+                      onStaffChange={(compId, v) =>
+                        saveRecord({ staff_scores: { ...rec.staff_scores, [compId]: v } })
                       }
                       onMgrChange={(compId, v) =>
                         saveRecord({ manager_scores: { ...rec.manager_scores, [compId]: v } })
@@ -283,10 +294,13 @@ export default function AttestationTab({
               переводит в «Зону риска».
             </div>
             <div className="result-note">
-              Рекомендуемый порядок оценки руководителем: сотрудники по своим
-              блокам компетенций → Руководитель сети (предпоследним) → CEO
-              (последним). Это не блокирует ввод — просто порядок, которого
-              стоит придерживаться.
+              Порядок оценки: сотрудники по своим блокам компетенций (колонка
+              «Оценка сотрудника») → Руководитель сети (предпоследним) → CEO
+              (последним) выставляют «Оценку руководителя» — она финальная
+              и попадает в итог. Пока «Оценка руководителя» не проставлена,
+              итог временно считается по оценке сотрудника, а если и её нет —
+              по самооценке. Ввод ничем не блокируется — это просто порядок,
+              которого стоит придерживаться.
             </div>
           </div>
 
@@ -372,23 +386,27 @@ function BlockRows({
   rec,
   competencies,
   selfEditable,
-  canEditCompetency,
+  mgrEditable,
+  canEditStaffScore,
   onSelfChange,
+  onStaffChange,
   onMgrChange,
 }: {
   block: ScoringBlock;
   rec: Attestation;
   competencies: CompetencyWithDepartments[];
   selfEditable: boolean;
-  canEditCompetency: (comp: CompetencyWithDepartments) => boolean;
+  mgrEditable: boolean;
+  canEditStaffScore: (comp: CompetencyWithDepartments) => boolean;
   onSelfChange: (compId: string, v: number | null) => void;
+  onStaffChange: (compId: string, v: number | null) => void;
   onMgrChange: (compId: string, v: number | null) => void;
 }) {
   const comps = competencies.filter((c) => c.block === block.id);
   return (
     <>
       <tr className="block-hdr">
-        <td colSpan={3}>
+        <td colSpan={4}>
           {block.name} <span className="w">(вес {block.weight})</span>
         </td>
       </tr>
@@ -413,8 +431,15 @@ function BlockRows({
           </td>
           <td className="center">
             <ScoreSelect
+              value={rec.staff_scores[c.id] ?? null}
+              editable={canEditStaffScore(c)}
+              onChange={(v) => onStaffChange(c.id, v)}
+            />
+          </td>
+          <td className="center">
+            <ScoreSelect
               value={rec.manager_scores[c.id] ?? null}
-              editable={canEditCompetency(c)}
+              editable={mgrEditable}
               onChange={(v) => onMgrChange(c.id, v)}
             />
           </td>
