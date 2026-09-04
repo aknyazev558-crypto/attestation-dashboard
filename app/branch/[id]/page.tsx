@@ -19,7 +19,7 @@ export default async function BranchPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, branch_id, full_name")
+    .select("role, branch_id, full_name, position")
     .eq("id", user.id)
     .single();
 
@@ -27,9 +27,10 @@ export default async function BranchPage({
 
   const isOwner = isOwnerLevel(profile.role);
   const isCeo = profile.role === "ceo";
+  const isStaff = profile.role === "staff";
   const isOwnDirector = profile.role === "director" && profile.branch_id === id;
 
-  if (!isOwner && !isOwnDirector) {
+  if (!isOwner && !isStaff && !isOwnDirector) {
     return (
       <>
         <Topbar roleLabel="Директор" />
@@ -42,6 +43,15 @@ export default async function BranchPage({
         </div>
       </>
     );
+  }
+
+  let staffBlockIds: string[] = [];
+  if (isStaff) {
+    const { data: access } = await supabase
+      .from("staff_block_access")
+      .select("block_id")
+      .eq("user_id", user.id);
+    staffBlockIds = (access || []).map((a) => a.block_id);
   }
 
   const { data: branch } = await supabase
@@ -64,6 +74,8 @@ export default async function BranchPage({
     ? "CEO"
     : isOwner
     ? "Руководитель сети"
+    : isStaff
+    ? profile.position || "Сотрудник"
     : `Директор — ${branch.name}`;
 
   return (
@@ -76,6 +88,8 @@ export default async function BranchPage({
           currentCycle={currentCycle}
           isOwner={isOwner}
           isCeo={isCeo}
+          isStaff={isStaff}
+          staffBlockIds={staffBlockIds}
           isOwnDirector={isOwnDirector}
           directorFullName={isOwnDirector ? profile.full_name : null}
         />

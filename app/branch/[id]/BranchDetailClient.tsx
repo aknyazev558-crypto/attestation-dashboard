@@ -12,6 +12,8 @@ export default function BranchDetailClient({
   currentCycle,
   isOwner,
   isCeo,
+  isStaff,
+  staffBlockIds,
   isOwnDirector,
   directorFullName,
 }: {
@@ -20,6 +22,8 @@ export default function BranchDetailClient({
   currentCycle: string | null;
   isOwner: boolean;
   isCeo: boolean;
+  isStaff: boolean;
+  staffBlockIds: string[];
   isOwnDirector: boolean;
   directorFullName: string | null;
 }) {
@@ -27,7 +31,7 @@ export default function BranchDetailClient({
 
   return (
     <div>
-      {isOwner && (
+      {(isOwner || isStaff) && (
         <Link
           href="/dashboard"
           className="btn ghost small"
@@ -79,6 +83,7 @@ export default function BranchDetailClient({
           currentCycle={currentCycle}
           isOwner={isOwner}
           isCeo={isCeo}
+          staffBlockIds={staffBlockIds}
           isOwnDirector={isOwnDirector}
         />
       ) : (

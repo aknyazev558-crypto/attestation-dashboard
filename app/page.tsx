@@ -22,7 +22,7 @@ export default async function RootPage() {
     redirect("/login?error=no-profile");
   }
 
-  if (isOwnerLevel(profile.role)) {
+  if (isOwnerLevel(profile.role) || profile.role === "staff") {
     redirect("/dashboard");
   }
 

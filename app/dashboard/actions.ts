@@ -296,3 +296,86 @@ export async function assignAdmin(formData: FormData) {
   revalidatePath("/dashboard");
   return { ok: true, passwordSet: !!password };
 }
+
+export async function assignStaff(formData: FormData) {
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const fullName = String(formData.get("fullName") || "").trim();
+  const position = String(formData.get("position") || "").trim();
+  const password = String(formData.get("password") || "").trim();
+  const blockIds = formData.getAll("blockIds").map((v) => String(v));
+
+  if (!email) {
+    return { error: "Укажите email." };
+  }
+  if (password && password.length < 6) {
+    return { error: "Пароль должен быть не короче 6 символов." };
+  }
+
+  const requester = await requireOwnerLevel();
+  if (!requester) {
+    return { error: "Только владелец сети или CEO может добавлять сотрудников." };
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      error:
+        "На сервере не настроен SUPABASE_SERVICE_ROLE_KEY — добавление сотрудников через приложение недоступно.",
+    };
+  }
+
+  const admin = createAdminClient();
+  const result = await provisionUser(admin, email, password, "/auth/set-password");
+  if (!result.id) {
+    return { error: result.error || "Не удалось создать пользователя." };
+  }
+
+  const { error: upsertError } = await admin.from("profiles").upsert({
+    id: result.id,
+    full_name: fullName || null,
+    role: "staff",
+    branch_id: null,
+    position: position || null,
+  });
+  if (upsertError) {
+    return { error: upsertError.message };
+  }
+
+  // Replace this person's block grants wholesale with whatever was checked.
+  await admin.from("staff_block_access").delete().eq("user_id", result.id);
+  if (blockIds.length) {
+    const { error: accessError } = await admin
+      .from("staff_block_access")
+      .insert(blockIds.map((block_id) => ({ user_id: result.id!, block_id })));
+    if (accessError) {
+      return { error: accessError.message };
+    }
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true, passwordSet: !!password };
+}
+
+export async function removeStaff(formData: FormData) {
+  const userId = String(formData.get("userId") || "");
+  if (!userId) {
+    return { error: "Сотрудник не указан." };
+  }
+
+  const requester = await requireOwnerLevel();
+  if (!requester) {
+    return { error: "Только владелец сети или CEO может удалять сотрудников." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .delete()
+    .eq("id", userId)
+    .eq("role", "staff");
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true };
+}

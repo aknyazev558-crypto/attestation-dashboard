@@ -1,4 +1,4 @@
-export type Role = "owner" | "director" | "ceo";
+export type Role = "owner" | "director" | "ceo" | "staff";
 
 export function isOwnerLevel(role: Role | null | undefined): boolean {
   return role === "owner" || role === "ceo";
@@ -17,6 +17,7 @@ export type Profile = {
   full_name: string | null;
   role: Role;
   branch_id: string | null;
+  position: string | null;
 };
 
 export type Cycle = {
@@ -75,6 +76,11 @@ export type LoginEvent = {
   created_at: string;
 };
 
+export type StaffBlockAccess = {
+  user_id: string;
+  block_id: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -86,7 +92,7 @@ export type Database = {
       };
       profiles: {
         Row: Profile;
-        Insert: Profile;
+        Insert: Partial<Profile> & { id: string; role: Role };
         Update: Partial<Profile>;
         Relationships: [];
       };
@@ -112,6 +118,12 @@ export type Database = {
         Row: LoginEvent;
         Insert: Partial<LoginEvent> & { user_id: string };
         Update: Partial<LoginEvent>;
+        Relationships: [];
+      };
+      staff_block_access: {
+        Row: StaffBlockAccess;
+        Insert: StaffBlockAccess;
+        Update: Partial<StaffBlockAccess>;
         Relationships: [];
       };
     };

@@ -9,8 +9,10 @@ import { addBranch, createCycle, deleteBranch, setCurrentCycle } from "./actions
 import AssignDirectorCell from "./AssignDirectorCell";
 import BranchNameCell from "./BranchNameCell";
 import AdminUsersPanel from "./AdminUsersPanel";
+import StaffAccessPanel from "./StaffAccessPanel";
 
 export default function DashboardClient({
+  canManage,
   branches,
   cycles,
   currentCycle,
@@ -19,7 +21,11 @@ export default function DashboardClient({
   directorNames,
   admins,
   adminEmails,
+  staff,
+  staffEmails,
+  staffBlocks,
 }: {
+  canManage: boolean;
   branches: Branch[];
   cycles: Cycle[];
   currentCycle: string | null;
@@ -28,6 +34,9 @@ export default function DashboardClient({
   directorNames: Record<string, string>;
   admins: Profile[];
   adminEmails: Record<string, string>;
+  staff: Profile[];
+  staffEmails: Record<string, string>;
+  staffBlocks: Record<string, string[]>;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -102,13 +111,20 @@ export default function DashboardClient({
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-        <Link href="/dashboard/activity" className="btn ghost small">
-          Активность входов →
-        </Link>
-      </div>
+      {canManage && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+          <Link href="/dashboard/activity" className="btn ghost small">
+            Активность входов →
+          </Link>
+        </div>
+      )}
 
-      <AdminUsersPanel admins={admins} adminEmails={adminEmails} />
+      {canManage && (
+        <>
+          <AdminUsersPanel admins={admins} adminEmails={adminEmails} />
+          <StaffAccessPanel staff={staff} staffEmails={staffEmails} staffBlocks={staffBlocks} />
+        </>
+      )}
 
       <div className="stats">
         <div className="stat">
@@ -133,31 +149,37 @@ export default function DashboardClient({
 
       <div className="section-title">
         <h2>Все филиалы — {currentCycle || "нет активного квартала"}</h2>
-        <div className="cycle-ctrl">
-          <span>Активный квартал:</span>
-          {cycles.length > 0 && (
-            <select
-              className="cyc"
-              value={currentCycle || ""}
-              disabled={isPending}
-              onChange={(e) => handleCycleChange(e.target.value)}
-            >
-              {cycles.map((c) => (
-                <option key={c.label} value={c.label}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          )}
-          <button className="btn small" onClick={handleNewCycle} disabled={isPending}>
-            + Новый квартал
-          </button>
-        </div>
+        {canManage ? (
+          <div className="cycle-ctrl">
+            <span>Активный квартал:</span>
+            {cycles.length > 0 && (
+              <select
+                className="cyc"
+                value={currentCycle || ""}
+                disabled={isPending}
+                onChange={(e) => handleCycleChange(e.target.value)}
+              >
+                {cycles.map((c) => (
+                  <option key={c.label} value={c.label}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button className="btn small" onClick={handleNewCycle} disabled={isPending}>
+              + Новый квартал
+            </button>
+          </div>
+        ) : (
+          <div className="cycle-ctrl">
+            <span>Активный квартал: {currentCycle || "—"}</span>
+          </div>
+        )}
       </div>
 
       <div className="sheet">
         {branches.length === 0 ? (
-          <div className="empty-state">Филиалов пока нет. Добавьте первый ниже.</div>
+          <div className="empty-state">Филиалов пока нет.</div>
         ) : (
           <div className="sheet-scroll">
             <table>
@@ -180,7 +202,7 @@ export default function DashboardClient({
                   return (
                     <tr className="hoverable" key={r.branch.id}>
                       <td className="dirname">
-                        <BranchNameCell branch={r.branch} />
+                        {canManage ? <BranchNameCell branch={r.branch} /> : r.branch.name}
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -194,7 +216,11 @@ export default function DashboardClient({
                               }
                             />
                           )}
-                          <AssignDirectorCell branchId={r.branch.id} directorName={director} />
+                          {canManage ? (
+                            <AssignDirectorCell branchId={r.branch.id} directorName={director} />
+                          ) : (
+                            director || <span className="dirname empty">Директор не назначен</span>
+                          )}
                         </div>
                       </td>
                       <td className="brands">{(r.branch.brands || []).join(", ")}</td>
@@ -214,13 +240,15 @@ export default function DashboardClient({
                         <Link className="link-open" href={`/branch/${r.branch.id}`}>
                           Открыть →
                         </Link>
-                        <button
-                          className="btn danger small"
-                          onClick={() => handleDeleteBranch(r.branch)}
-                          disabled={isPending}
-                        >
-                          Удалить
-                        </button>
+                        {canManage && (
+                          <button
+                            className="btn danger small"
+                            onClick={() => handleDeleteBranch(r.branch)}
+                            disabled={isPending}
+                          >
+                            Удалить
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -230,20 +258,22 @@ export default function DashboardClient({
           </div>
         )}
 
-        <form
-          className="add-row-form"
-          action={(formData) => {
-            startTransition(() => {
-              addBranch(formData);
-            });
-          }}
-        >
-          <input name="name" placeholder="Название нового филиала" required />
-          <input name="brands" placeholder="Бренды через запятую" />
-          <button className="btn small" type="submit" disabled={isPending}>
-            + Добавить филиал
-          </button>
-        </form>
+        {canManage && (
+          <form
+            className="add-row-form"
+            action={(formData) => {
+              startTransition(() => {
+                addBranch(formData);
+              });
+            }}
+          >
+            <input name="name" placeholder="Название нового филиала" required />
+            <input name="brands" placeholder="Бренды через запятую" />
+            <button className="btn small" type="submit" disabled={isPending}>
+              + Добавить филиал
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

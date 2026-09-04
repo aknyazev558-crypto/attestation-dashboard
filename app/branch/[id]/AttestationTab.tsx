@@ -38,6 +38,7 @@ export default function AttestationTab({
   currentCycle,
   isOwner,
   isCeo,
+  staffBlockIds,
   isOwnDirector,
 }: {
   branchId: string;
@@ -45,6 +46,7 @@ export default function AttestationTab({
   currentCycle: string | null;
   isOwner: boolean;
   isCeo: boolean;
+  staffBlockIds: string[];
   isOwnDirector: boolean;
 }) {
   const [selectedCycle, setSelectedCycle] = useState<string | null>(currentCycle);
@@ -80,6 +82,8 @@ export default function AttestationTab({
   const isCurrentCycle = selectedCycle === currentCycle;
   const mgrEditable = isOwner && isCurrentCycle;
   const ceoEditable = isCeo && isCurrentCycle;
+  const canEditBlock = (blockId: string) =>
+    isCurrentCycle && (isOwner || staffBlockIds.includes(blockId));
 
   async function saveRecord(patch: Partial<Attestation>) {
     if (!record || !selectedCycle) return false;
@@ -243,7 +247,7 @@ export default function AttestationTab({
                       bid={bid}
                       rec={rec}
                       selfEditable={selfEditable}
-                      mgrEditable={mgrEditable}
+                      mgrEditable={canEditBlock(bid)}
                       onSelfChange={(compId, v) =>
                         saveRecord({ self_scores: { ...rec.self_scores, [compId]: v } })
                       }
