@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth/set-password"];
+const CHANGE_PASSWORD_PATH = "/auth/change-password";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -44,6 +45,16 @@ export async function updateSession(request: NextRequest) {
   if (user && request.nextUrl.pathname === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
+
+  if (
+    user &&
+    user.user_metadata?.must_change_password &&
+    request.nextUrl.pathname !== CHANGE_PASSWORD_PATH
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = CHANGE_PASSWORD_PATH;
     return NextResponse.redirect(url);
   }
 

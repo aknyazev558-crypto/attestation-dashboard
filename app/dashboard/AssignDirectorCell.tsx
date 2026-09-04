@@ -43,7 +43,8 @@ export default function AssignDirectorCell({
       <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
         <div className="field-note">
           Пароль для <b>{savedPassword.email}</b> — сообщите его директору сами (по телефону,
-          в мессенджере и т.п.), письмо не отправлялось:
+          в мессенджере и т.п.), письмо не отправлялось. При первом входе приложение попросит
+          его сразу сменить пароль:
         </div>
         <code style={{ userSelect: "all" }}>{savedPassword.password}</code>
         <button className="btn small" onClick={reset}>

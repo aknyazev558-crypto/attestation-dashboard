@@ -168,7 +168,7 @@ export async function assignDirector(formData: FormData) {
     if (existingUser) {
       const { data: updated, error: updateError } = await admin.auth.admin.updateUserById(
         existingUser.id,
-        { password, email_confirm: true }
+        { password, email_confirm: true, user_metadata: { must_change_password: true } }
       );
       if (updateError || !updated?.user) {
         return { error: updateError?.message || "Не удалось задать пароль." };
@@ -179,6 +179,7 @@ export async function assignDirector(formData: FormData) {
         email,
         password,
         email_confirm: true,
+        user_metadata: { must_change_password: true },
       });
       if (createError || !created?.user) {
         return { error: createError?.message || "Не удалось создать пользователя." };
