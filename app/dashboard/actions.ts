@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getSiteUrl } from "@/lib/site-url";
 
 export async function addBranch(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
@@ -82,28 +83,33 @@ export async function assignDirector(formData: FormData) {
 
   const admin = createAdminClient();
 
-  let targetId: string | null = null;
-  const { data: existingList, error: listError } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-  if (listError) {
-    return { error: listError.message };
-  }
-  const existingUser = existingList.users.find(
-    (u) => (u.email || "").toLowerCase() === email
+  // Try inviting first: for a brand-new email this creates the user and
+  // sends the invite; for an email that was invited before but never
+  // confirmed, Supabase resends a fresh link (picking up the redirectTo
+  // fix below even for invites sent earlier). It only fails once the
+  // account is already confirmed — in that case we just look them up and
+  // reassign, without sending another email.
+  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+    email,
+    { redirectTo: `${getSiteUrl()}/auth/set-password` }
   );
 
-  if (existingUser) {
-    targetId = existingUser.id;
-  } else {
-    const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
-      email
+  let targetId: string | null = invited?.user?.id ?? null;
+  if (!targetId) {
+    const { data: existingList, error: listError } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    if (listError) {
+      return { error: listError.message };
+    }
+    const existingUser = existingList.users.find(
+      (u) => (u.email || "").toLowerCase() === email
     );
-    if (inviteError || !invited?.user) {
+    if (!existingUser) {
       return { error: inviteError?.message || "Не удалось пригласить пользователя." };
     }
-    targetId = invited.user.id;
+    targetId = existingUser.id;
   }
 
   const { error: upsertError } = await admin.from("profiles").upsert({
