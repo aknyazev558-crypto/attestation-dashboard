@@ -11,6 +11,7 @@ export default function BranchDetailClient({
   cycles,
   currentCycle,
   isOwner,
+  isCeo,
   isOwnDirector,
   directorFullName,
 }: {
@@ -18,6 +19,7 @@ export default function BranchDetailClient({
   cycles: Cycle[];
   currentCycle: string | null;
   isOwner: boolean;
+  isCeo: boolean;
   isOwnDirector: boolean;
   directorFullName: string | null;
 }) {
@@ -76,10 +78,16 @@ export default function BranchDetailClient({
           cycles={cycles}
           currentCycle={currentCycle}
           isOwner={isOwner}
+          isCeo={isCeo}
           isOwnDirector={isOwnDirector}
         />
       ) : (
-        <IprTab branchId={branch.id} isOwner={isOwner} isOwnDirector={isOwnDirector} />
+        <IprTab
+          branchId={branch.id}
+          isOwner={isOwner}
+          isCeo={isCeo}
+          isOwnDirector={isOwnDirector}
+        />
       )}
     </div>
   );

@@ -3,10 +3,11 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import { computeResult, nextQuarterLabel } from "@/lib/competencies";
-import type { Attestation, Branch, Cycle, IprItem } from "@/lib/types";
+import type { Attestation, Branch, Cycle, IprItem, Profile } from "@/lib/types";
 import { addBranch, createCycle, deleteBranch, setCurrentCycle } from "./actions";
 import AssignDirectorCell from "./AssignDirectorCell";
 import BranchNameCell from "./BranchNameCell";
+import AdminUsersPanel from "./AdminUsersPanel";
 
 export default function DashboardClient({
   branches,
@@ -15,6 +16,8 @@ export default function DashboardClient({
   attestations,
   iprItems,
   directorNames,
+  admins,
+  adminEmails,
 }: {
   branches: Branch[];
   cycles: Cycle[];
@@ -22,6 +25,8 @@ export default function DashboardClient({
   attestations: Attestation[];
   iprItems: IprItem[];
   directorNames: Record<string, string>;
+  admins: Profile[];
+  adminEmails: Record<string, string>;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -82,6 +87,8 @@ export default function DashboardClient({
 
   return (
     <div>
+      <AdminUsersPanel admins={admins} adminEmails={adminEmails} />
+
       <div className="stats">
         <div className="stat">
           <div className="num">{branches.length}</div>

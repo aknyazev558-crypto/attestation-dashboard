@@ -23,6 +23,7 @@ function blankRecord(branchId: string, cycle: string): Attestation {
     growth_areas: "",
     discussion: "",
     decision: "",
+    ceo_comment: "",
     next_date: null,
     updated_at: "",
   };
@@ -33,12 +34,14 @@ export default function AttestationTab({
   cycles,
   currentCycle,
   isOwner,
+  isCeo,
   isOwnDirector,
 }: {
   branchId: string;
   cycles: Cycle[];
   currentCycle: string | null;
   isOwner: boolean;
+  isCeo: boolean;
   isOwnDirector: boolean;
 }) {
   const [selectedCycle, setSelectedCycle] = useState<string | null>(currentCycle);
@@ -73,6 +76,7 @@ export default function AttestationTab({
   const isCurrentCycle = selectedCycle === currentCycle;
   const selfEditable = isOwnDirector && isCurrentCycle;
   const mgrEditable = isOwner && isCurrentCycle;
+  const ceoEditable = isCeo && isCurrentCycle;
 
   async function saveRecord(patch: Partial<Attestation>) {
     if (!record || !selectedCycle) return;
@@ -91,6 +95,7 @@ export default function AttestationTab({
           growth_areas: next.growth_areas,
           discussion: next.discussion,
           decision: next.decision,
+          ceo_comment: next.ceo_comment,
           next_date: next.next_date,
         },
         { onConflict: "branch_id,cycle" }
@@ -230,6 +235,12 @@ export default function AttestationTab({
             value={rec.decision}
             editable={mgrEditable}
             onSave={(v) => saveRecord({ decision: v })}
+          />
+          <TextField
+            label="Комментарий/рекомендации от CEO"
+            value={rec.ceo_comment}
+            editable={ceoEditable}
+            onSave={(v) => saveRecord({ ceo_comment: v })}
           />
 
           <div className="field-block">

@@ -1,4 +1,8 @@
-export type Role = "owner" | "director";
+export type Role = "owner" | "director" | "ceo";
+
+export function isOwnerLevel(role: Role | null | undefined): boolean {
+  return role === "owner" || role === "ceo";
+}
 
 export type ScoreMap = Record<string, number | null>;
 
@@ -31,6 +35,7 @@ export type Attestation = {
   growth_areas: string | null;
   discussion: string | null;
   decision: string | null;
+  ceo_comment: string | null;
   next_date: string | null;
   updated_at: string;
 };
@@ -44,6 +49,9 @@ export const IPR_STATUSES = [
 
 export type IprStatus = (typeof IPR_STATUSES)[number];
 
+export const IPR_SOURCES = ["owner", "ceo"] as const;
+export type IprSource = (typeof IPR_SOURCES)[number];
+
 export type IprItem = {
   id: string;
   branch_id: string;
@@ -54,6 +62,7 @@ export type IprItem = {
   curator: string | null;
   status: IprStatus;
   note: string | null;
+  source: IprSource;
   created_at: string;
 };
 

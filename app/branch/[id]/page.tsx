@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Topbar from "@/app/components/Topbar";
 import BranchDetailClient from "./BranchDetailClient";
+import { isOwnerLevel } from "@/lib/types";
 import type { Cycle } from "@/lib/types";
 
 export default async function BranchPage({
@@ -24,7 +25,8 @@ export default async function BranchPage({
 
   if (!profile) redirect("/login?error=no-profile");
 
-  const isOwner = profile.role === "owner";
+  const isOwner = isOwnerLevel(profile.role);
+  const isCeo = profile.role === "ceo";
   const isOwnDirector = profile.role === "director" && profile.branch_id === id;
 
   if (!isOwner && !isOwnDirector) {
@@ -58,7 +60,9 @@ export default async function BranchPage({
   const cycleList = (cycles as Cycle[]) || [];
   const currentCycle = cycleList.find((c) => c.is_current)?.label || null;
 
-  const roleLabel = isOwner
+  const roleLabel = isCeo
+    ? "CEO"
+    : isOwner
     ? "Руководитель сети"
     : `Директор — ${branch.name}`;
 
@@ -71,6 +75,7 @@ export default async function BranchPage({
           cycles={cycleList}
           currentCycle={currentCycle}
           isOwner={isOwner}
+          isCeo={isCeo}
           isOwnDirector={isOwnDirector}
           directorFullName={isOwnDirector ? profile.full_name : null}
         />

@@ -8,10 +8,12 @@ import type { IprItem, IprStatus } from "@/lib/types";
 export default function IprTab({
   branchId,
   isOwner,
+  isCeo,
   isOwnDirector,
 }: {
   branchId: string;
   isOwner: boolean;
+  isCeo: boolean;
   isOwnDirector: boolean;
 }) {
   const [items, setItems] = useState<IprItem[] | null>(null);
@@ -58,6 +60,7 @@ export default function IprTab({
         metric: form.metric.trim(),
         curator: form.curator.trim(),
         status: "Не начат",
+        source: isCeo ? "ceo" : "owner",
       })
       .select()
       .single();
@@ -94,6 +97,11 @@ export default function IprTab({
               {items.map((item) => (
                 <tr key={item.id}>
                   <td>
+                    {item.source === "ceo" && (
+                      <span className="badge accent" style={{ marginRight: 6 }}>
+                        CEO
+                      </span>
+                    )}
                     <input
                       className="ipr-input"
                       defaultValue={item.zone || ""}
@@ -197,7 +205,7 @@ export default function IprTab({
               onChange={(e) => setForm({ ...form, curator: e.target.value })}
             />
             <button className="btn small" onClick={addItem}>
-              + Добавить пункт ИПР
+              {isCeo ? "+ Добавить пункт ИПР от CEO" : "+ Добавить пункт ИПР"}
             </button>
           </div>
         </div>

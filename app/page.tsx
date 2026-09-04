@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isOwnerLevel } from "@/lib/types";
 
 export default async function RootPage() {
   const supabase = await createClient();
@@ -21,7 +22,7 @@ export default async function RootPage() {
     redirect("/login?error=no-profile");
   }
 
-  if (profile.role === "owner") {
+  if (isOwnerLevel(profile.role)) {
     redirect("/dashboard");
   }
 
